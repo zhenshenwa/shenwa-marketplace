@@ -1,0 +1,70 @@
+# ==============================================================
+# 预设 · 成长挖掘
+# 来源：03A-偏好选项库 · A1 = growth
+# 一句话画像：抓产业趋势，容忍高估值换取增长斜率
+# 适用：成长股研究、产业趋势跟踪、主题投资
+# 用法：复制本文件内容，覆盖到 profile.yaml 即可运行
+# ==============================================================
+
+meta:
+  client_name: "<请填写>"
+  preset_name: "成长挖掘"
+  based_on: "A1=growth"
+  profile_version: "1.0.0"
+  last_updated: "2026-09-25"
+
+identity:
+  primary_style: growth           # A1 = ②成长挖掘
+  secondary_style: ""             # 次口径：可填 thematic 视角，见下方备注
+  horizon: medium                 # A2 = ②中期 1~3 年
+  risk_tolerance: balanced        # A3 = ②中性
+  conclusion_bias: neutral        # A4 = ②中性
+
+overrides:
+  valuation_method: auto          # B1 = ①自动派生 → PEG / PS / 远期 PE
+  focus_metrics: growth_momentum  # B2 = ③成长动能
+
+data_weights:                     # B3 = ②均衡
+  fundamental: 0.35
+  valuation: 0.25
+  capital_flow: 0.15
+  sentiment_news: 0.15
+  technical: 0.10
+
+shenwa:
+  intensity: baseline             # E1 = ②基准 约 50%
+  report_depth: standard
+  template_preference: []
+  return_full_text: true
+  download_pdf: on_request        # E2 = ②询问后
+  archive_mode: private           # E3 = ①私有保存
+  precheck_balance: true
+
+datasource:
+  market_scope: [A]               # C1 = ①A 股
+  watchlist_mode: theme_tracking  # C2 = ③主题跟踪型（主题投资首选）
+  watchlist: []
+  cross_check_tolerance: 0.01     # D6 = ②标准 1.0%
+  require_source_annotation: true
+
+output:
+  language: zh                    # D3 = ①中文
+  depth: standard                 # D1 = ②标准
+  format: markdown                # D2 = ①Markdown
+  include_visual: key             # D4 = ②关键图表
+  include_validation_table: full  # D5 = ①完整校验表
+  max_length: 0
+
+corrections: []
+
+# --------------------------------------------------------------
+# 该预设下的典型产出特征
+# --------------------------------------------------------------
+# · 估值默认走 PEG / PS / 远期 PE，强调增速与估值的匹配度
+# · 财务取数区间 3 年，重点看增速环比与加速度
+# · 核心关注：营收增速、毛利率趋势、研发投入、行业渗透率
+# · 结论给出增速与估值的匹配判断，而非单纯的价值高低
+#
+# 主题投资变体：若客户以主题驱动为主，可将 secondary_style 设为
+# "thematic" 并保持 watchlist_mode = theme_tracking，系统会在结论中
+# 追加 TAM / 渗透率 / 产业链卡位的空间测算视角。

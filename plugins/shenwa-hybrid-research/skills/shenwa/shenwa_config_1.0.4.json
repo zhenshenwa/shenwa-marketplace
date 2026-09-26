@@ -1,0 +1,1128 @@
+{
+  "name": "shenwa",
+  "cn_name": "深挖",
+  "version": "1.0.4",
+  "description": "Shenwa（深挖） - AI深度调查报告工具",
+  "base_url": {
+    "primary": "https://www.shenwa.top",
+    "fallbacks": ["http://8.130.17.247:8088"],
+    "strategy": "primary_fallback"
+  },
+   "auth": {
+     "type": "bearer",
+     "obtain_via": "login",
+     "session_token_field": "browserCode",
+     "session_token_storage": "memory_or_local_file",
+     "session_token_ttl_hint": "until 401",
+     "user_credentials": [
+       { "key": "phone", "prompt": "请输入注册手机号" },
+       { "key": "inviteCode", "prompt": "请输入邀请码" }
+     ],
+     "user_types": [
+       { "name": "VIP", "prompt": "深挖点付费用户" },
+       { "name": "VIP2", "prompt": "深挖点付费+接口包时付费用户" }
+     ]
+   },
+  "meta": {
+    "support_contact": {"wechat": "shenwa4119"},
+    "wechat_public_platform": "真深挖者也",
+    "homepage": "https://www.shenwa.top"
+  },
+  "triggers": {
+    "use_when": [
+      "用户想对某公司、行业、事件做深度研究/调查",
+      "用户想持续跟踪某个行业或个股",
+      "用户想阅读全市场报告",
+      "用户提到'深挖''调研''调查报告''行业分析''公司研究''财报分析''政策解读'",
+      "用户问'最近 XX 股票/公司有什么动态'且需要结构化结论"
+    ],
+    "do_not_use_when": [
+      "用户只是闲聊问'XX 公司是做什么的'这种 1~2 句话能答完的事实问题",
+      "用户要求实时行情、当前股价（本 skill 仅在调查报告中引用必要的实时数据，不提供单独的实时数据查询）",
+      "用户要做新闻摘要而非深度分析"
+    ],
+    "keywords": ["shenwa", "深挖", "调查报告", "行业研究", "公司调研", "深度分析", "财报分析", "政策解读"]
+  },
+  "glossary": {
+    "深挖点 (restPoint)": "用户账户的消费额度，每发布一份报告会按模板的 cost 字段扣减",
+    "模板 (template)": "预设的报告生成框架，不同模板适用不同场景（公司研究/行业分析/事件复盘等），需先调 templates 接口获取列表让用户挑选",
+    "背景消息 (text)": "用户提供的辅助资料，可选，会作为生成报告的上下文",
+    "报告状态 (status)": "inprogress=正在生成；public=已发布且公开；private=已发布但仅自己可见；error=已发布但处理出错"
+  },
+  "agent_guidelines": {
+    "before_publish": [
+      "调用 report_publish 前，必须先调 user_info 检查 restPoint 是否充足、expireTime 是否过期",
+      "若 restPoint 小于模板 cost，提示用户'剩余 X 点不足以发布该模板（需 Y 点），请联系微信 %wechat% 充值'",
+      "若用户问题模糊，先反问以聚焦，再生成报告（避免浪费深挖点）"
+    ],
+    "after_publish": [
+      "提交后明确告知用户'报告生成需 3~10 分钟，我会稍后查询'，不要假装实时完成",
+      "建议按 async 段的建议轮询，仍未完成则提示用户稍后自行查看"
+    ],
+    "check_list": [
+      "用户想要报告列表时，默认返回公共报告列表，并告知用户这是公共列表，且询问用户是否想要查看私有列表或收藏列表",
+      "返回的用户的报告列表，建议采用编号、发布时间、模板名和报告标题字段，每页显示20条"
+    ],
+    "before_check_detail": [
+      "用户提出查看全市场报告或每日报告时，默认返回最新的深挖市场快报",
+      "在返回给用户报告详情前，除非用户明确提出或基于用户习惯判断，否则应返回报告原文，勿擅自返回简化的报告"
+    ],
+    "after_check_detail": [
+      "在返回给用户报告详情后，询问用户是否需要下载此报告的PDF"
+    ],
+    "tone": "假设用户为投研、行业分析师，回答时保持专业、克制，避免口语化",
+    "privacy": "不要在对话中回显 browserCode/Token"
+  },
+  "cost_model": {
+    "currency": "深挖点",
+    "consumed_by": ["report_publish"],
+    "cost_field": "templates[].cost",
+    "check_before_call": "user_info.restPoint",
+    "exchange_hint": "充值请联系微信 %wechat%"
+  },
+  "safety": {
+    "disallowed_topics": ["政治敏感话题", "暴力非法话题", "基于谣言发布报告"],
+    "content_warnings": "报告由 AI 生成，可能包含错误，仅用作参考，重大投资决策前请人工复核"
+  },
+  "work_flows": {
+    "login": {
+      "description": "用户登录",
+      "steps": {
+        "step1": {
+          "action": "load_credentials",
+          "source": "auth.user_credentials",
+          "description": "从本地存储读取手机号和邀请码；若不存在，按 auth.user_credentials 的 prompt 引导用户首次输入并保存"
+        },
+        "step2": {
+          "action": "request_api",
+          "api_name": "login",
+          "description": "执行登录并保存Token(browserCode)"
+        }
+      }
+    },
+    "report_manage": {
+      "description": "报告查询、管理、发布等流程",
+      "steps": {
+        "step1": {
+          "action": "request_api",
+          "api_name": "templates",
+          "description": "查看模板列表，了解系统提供了哪些报告模板"
+        },
+        "step2": {
+          "action": "ensure_user_demand",
+          "description": "确定用户需求，将用户需要解决的问题转化为：背景消息（可为空）、问题和模板ID。",
+          "note": "在无法确定模板时，向用户询问要使用哪个模板，注意询问时不要向用户列出所有模板，仅列出与用户需求高度匹配的模板即可"
+        },
+        "step3": {
+          "action": "request_api",
+          "api_name": "report_publish",
+          "description": "提交背景消息（可为空）、问题和模板ID发表报告，此发表方式为异步，系统后台会执行此报告，时间在3~10分钟之内",
+          "note": "问题在60以内，复杂要求可在背景消息中补充；背景消息（可为空）不多于500字"
+        },
+        "step4": {
+          "action": "request_api",
+          "api_name": "report_status",
+          "description": "参照report_publish中的async规则向report_status接口发起轮询，检查报告是否成功发布，参数aid为刚发表的报告id，成功后进入step5查看报告详情，若失败则中断流程并向用户报告异常"
+        },
+        "step5": {
+          "action": "request_api",
+          "api_name": "report_detail",
+          "description": "读取指定的报告，参数aid为新报告的ID"
+        },
+        "step6": {
+          "action": "output_to_user",
+          "description": "向用户返回结果，并根据询问用户是否导出pdf，若用户确认，则调用download_pdf接口下载报告PDF"
+        }
+      }
+    },
+    "roll_page": {
+      "description": "报告列表翻页",
+      "steps": {
+        "step1": {
+          "action": "request_api",
+          "api_name": "report_list",
+          "description": "设定一个报告数量num，查看报告列表，列表中的报告按时间降序排列",
+          "roll_page_pramas": "准备翻页参数，找到列表中的hasNext参数，若为true则表示还有下一页。取出列表所有报告最小的time值作为after参数，进入step2"
+        },
+        "step2": {
+          "action": "request_api",
+          "api_name": "report_list",
+          "description": "以step1中的num和after参数发起请求，服务器将返回小于after时间的num个报告"
+        }
+      }
+    },
+    "update": {
+      "description": "Skill升级",
+      "requires_user_confirmation": true,
+      "steps": {
+        "step1": {
+          "action": "request_api",
+          "api_name": "latest_version",
+          "description": "查看最新版本，若最新版本高于当前版本，则进入下一步，否则报告用户“当前已是最新版本”并退出"
+        },
+        "step2": {
+          "action": "request_api",
+          "api_name": "download_version",
+          "description": "下载指定版本的shenwa_config_<verion>.json文件到~/.openclaw/workspace/skills/shenwa/"
+        },
+        "step3": {
+          "action": "run_install",
+          "description": "执行安装过程：备份当前文件和配置，从新版本json文件中提取API列表，更新SKILL.md，在py文件中更新接口读写脚本",
+          "note": "旧接口的功能可能有升级，注意覆盖更新所有接口"
+        }
+      }
+    }
+  },
+  "response_schema": {
+    "success_field": "success",
+    "status_field": "status",
+    "data_field": "data",
+    "message_field": "msg"
+  },
+  "api_endpoints": [
+    {
+      "name": "login",
+      "path": "/api/user/doLogin",
+      "description": "执行登录，开启session cookie以让服务器保存会话，下次访可既可通过登录创建会话，也可通过本次登录成功获取的browserCode创建会话",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "POST",
+        "params": [
+          {
+            "param": "userID",
+            "description": "用户名（注册手机号），联系微信%wechat%，以注册手机号",
+            "required": true
+          },
+          {
+            "param": "inviteCode",
+            "description": "邀请码（随账号发放，临时方案，正式版后将取消）",
+            "required": true
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "browserCode": "Token码，保存此Token，以后可通过此Token直接访问接口"
+            },
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "手机号错误",
+              "time": "服务器时间"
+            },
+            "description": "手机号未注册，联系微信%wechat%，以注册手机号"
+          }
+        ]
+      }
+    },
+    {
+      "name": "report_list",
+      "path": "/api/home/getList",
+      "description": "获取报告列表",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": [
+          {
+            "param": "type",
+            "description": "报告类型，取值：public公开报告，self我的报告，collect我收藏的报告，history我访问过的报告（缺省为public）",
+            "required": false
+          },
+          {
+            "param": "num",
+            "description": "结果数量（缺省为10）",
+            "required": false
+          },
+          {
+            "param": "after",
+            "description": "获取某个时间之后的报告，用于翻页。如果上一页的hasNext为true，则将时间最大的报告作为after参数以获取下一页列表",
+            "required": false
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "list": [
+                {
+                  "aid": "报告ID",
+                  "nid": "背景消息ID",
+                  "tid": "模板ID",
+                  "tTitle": "模板标题",
+                  "tImg": "模板图标",
+                  "title": "报告标题",
+                  "vuser": "用户名",
+                  "vpic": "用户头像图片",
+                  "vquestion": "我的提问",
+                  "stocks": "报告涉及的股票，格式为：股票名,代码,股票在报告中的情感偏向,股票市场，多个股票用分号隔开（如：源杰科技,688498,积极,A;Nvidia,NVDA,中性,美）",
+                  "time": "报告发表时间",
+                  "status": "报告状态"
+                }
+              ],
+              "hasNext": "是否还有后续报告（用于翻页），取值true/false"
+            },
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          }
+        ]
+      }
+    },
+    {
+      "name": "report_detail",
+      "path": "/api/home/getDetail",
+      "description": "获取指定报告",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": [
+          {
+            "param": "aid",
+            "description": "报告ID",
+            "required": true
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "aid": "报告ID",
+              "nid": "背景消息ID",
+              "tid": "模板ID",
+              "tTitle": "模板标题",
+              "tImg": "模板图标",
+              "vuser": "用户名",
+              "vpic": "用户头像图片",
+              "vquestion": "我的提问",
+              "stocks": "报告涉及的股票，格式为：股票名,代码,股票在报告中的情感偏向,股票市场，多个股票用分号隔开（如：源杰科技,688498,积极,A;Nvidia,NVDA,中性,美）",
+              "detail": "报告详情",
+              "time": "报告发表时间",
+              "collect": "是否收藏，取值true/false",
+              "like": "是否点赞，取值true/false"
+            },
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "文章不存在",
+              "time": "服务器时间"
+            },
+            "description": "文章ID错误"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "文章已被删除",
+              "time": "服务器时间"
+            },
+            "description": "文章已被删除"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "文章已下线",
+              "time": "服务器时间"
+            },
+            "description": "文章已被下架，可能是涉及信息违规"
+          }
+        ]
+      }
+    },
+    {
+      "name": "templates",
+      "path": "/api/manage/getTemplateListWithType",
+      "description": "以分类视图获取模板列表",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": []
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": [
+              {
+                "id": "模板分类ID",
+                "name": "模板分类名称",
+                "describe": "模板分类描述",
+                "templates": [
+                  {
+                    "id": "模板ID",
+                    "type": "模板所属分类ID",
+                    "title": "模板标题",
+                    "describe": "模板特性描述",
+                    "image": "模板图标",
+                    "cost": "模板消耗（使用此模板的报告花费多少个深挖点）"
+                  }
+                ]
+              }
+            ],
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          }
+        ]
+      }
+    },
+    {
+      "name": "delete_report",
+      "path": "/api/home/deleteArticle",
+      "description": "删除用户自己的报告",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": [
+          {
+            "param": "aid",
+            "description": "报告ID",
+            "required": true
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": null,
+            "msg": "删除文章成功",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "ID不存在",
+              "time": "服务器时间"
+            },
+            "description": "报告ID不存在"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "无法删除此文章",
+              "time": "服务器时间"
+            },
+            "description": "无删除权限，用户只能删除自己发布的报告"
+          }
+        ]
+      }
+    },
+    {
+      "name": "collect_report",
+      "path": "/api/home/doArticleAction",
+      "description": "收藏/取消收藏报告",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "POST",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": [
+          {
+            "param": "aid",
+            "description": "报告ID",
+            "required": true
+          },
+          {
+            "param": "action",
+            "description": "对报告执行动作，取值collect：对未收藏的报告执行收藏，对已收藏的报告执行取消收藏",
+            "required": true
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "action": "collect",
+              "status": "执行后的状态，collected已收藏，cancel-collect已取消收藏",
+              "aid": "执行动作的报告ID"
+            },
+            "msg": "状态更新成功",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "文章ID不存在",
+              "time": "服务器时间"
+            },
+            "description": "报告ID不存在"
+          }
+        ]
+      }
+    },
+    {
+      "name": "report_publish",
+      "path": "/api/manage/wfStartPublish",
+      "description": "以异步方式发表报告",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "POST",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": [
+          {
+            "param": "tid",
+            "description": "模板ID",
+            "required": true
+          },
+          {
+            "param": "text",
+            "description": "背景消息（不可多于500字）",
+            "required": false
+          },
+          {
+            "param": "question",
+            "description": "用户问题（不可多于60字，复杂要求可在背景消息中补充）",
+            "required": true
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "aid": "新报告ID"
+            },
+            "msg": "提交任务成功",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "问题不可多于60字，复杂要求可在背景消息中补充",
+              "time": "服务器时间"
+            },
+            "description": "问题长度限制"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "背景消息不可多于500字",
+              "time": "服务器时间"
+            },
+            "description": "背景消息长度限制"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "user_intent": "我想研究一下宁德时代最近的动作",
+          "agent_action": "先调 templates 获取模板，向用户展示候选模板，让用户选择'公司研究'类，然后调 report_publish 提交 question='宁德时代近期战略动作分析' + 用户选定的 tid"
+        }
+      ],
+      "async": {
+        "is_async": true,
+        "typical_duration_seconds": 300,
+        "max_duration_seconds": 600,
+        "poll_api_endpoint": "report_status",
+        "poll_param": "aid",
+        "poll_param_source": "report_publish.response.data.aid",
+        "poll_done_when": "data.status in ['public', 'private', 'error']",
+        "poll_pending_when": "data.status == 'inprogress'",
+        "poll_failed_when": "data.status == 'error'",
+        "recommended_interval_seconds": 30,
+        "max_attempts": 24
+      }
+    },
+    {
+      "name": "report_status",
+      "path": "/api/home/getReportStatus",
+      "description": "获取报告状态",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": [
+          {
+            "param": "aid",
+            "description": "报告ID",
+            "required": true
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "id": "报告ID",
+              "status": "inprogress | private | public | error",
+              "time": "报告创建时间",
+              "progress_msg": "进度过程消息，仅在inprogress状态下有此字段",
+              "error_msg": "错误说明，仅在error状态下有此字段"
+            },
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "你没有获取此报告状态的权限",
+              "time": "服务器时间"
+            },
+            "description": "用户只能获取自己发表报告的状态"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "报告不存在或已下架",
+              "time": "服务器时间"
+            },
+            "description": "报告ID错误，或报告被删除/下架"
+          }
+        ]
+      }
+    },
+    {
+      "name": "user_info",
+      "path": "/api/user/getUser",
+      "description": "获取用户信息",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": []
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "type": "用户类型：test测试用户、vip付费用户、adm管理员",
+              "userID": "用户ID，用户登录的手机号",
+              "pic": "用户头像文件",
+              "name": "用户名（不用于登录）",
+              "vname": "用户显示名，显示到报告中的作者名",
+              "restPoint": "剩余深挖点数，此点数用于支付发布报告的消费",
+              "expireTime": "用户有效期，超过有效期的用户无法发布报告"
+            },
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          }
+        ]
+      }
+    },
+    {
+      "name": "download_pdf",
+      "path": "/api/home/downloadPdf",
+      "description": "下载报告pdf",
+      "authorization": ["ADM", "VIP", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token"
+          }
+        ],
+        "params": [
+          {
+            "param": "aid",
+            "description": "报告ID",
+            "required": true
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/pdf",
+          "data_stream": "PDF file stream"
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "报告不存在或已下架",
+              "time": "服务器时间"
+            },
+            "description": "报告ID错误，或该报告已被删除/下架"
+          },
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "SRV",
+              "data": null,
+              "msg": "你没有下载此报告的权限",
+              "time": "服务器时间"
+            },
+            "description": "非管理员用户只能下载自己发布的报告，或status为public的报告"
+          }
+        ]
+      }
+    },
+    {
+      "name": "get_guaili_rates",
+      "path": "/api/review/getGuailiRates",
+      "description": "获取乖离率",
+      "authorization": ["ADM", "VIP2"],
+      "request": {
+        "method": "GET",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token。"
+          }
+        ],
+        "params": [
+          {
+            "param": "date",
+            "description": "最新数据日期，缺省为最近交易日",
+            "required": false
+          },
+	  {
+            "param": "maxDays",
+            "description": "交易日数，缺省20",
+            "required": false
+          }
+        ]
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": [{
+              "date": "yyyy-MM-dd",
+              "values": [{"t": "行业", "v": "乖离率"}]
+            }],
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+	  {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "你没有权限",
+              "time": "服务器时间"
+            },
+            "description": "无VIP2权限，联系微信 %wechat% 升级VIP2"
+          },
+	  {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "你的 VIP2 权限已过期",
+              "time": "服务器时间"
+            },
+            "description": "VIP2包时已到期，请联系微信 %wechat% 续期"
+          }
+        ]
+      }
+    },
+    {
+      "name": "knowledge_search",
+      "path": "/api/data/knowledgeSearch",
+      "description": "查询深挖内置知识库",
+      "authorization": ["ADM", "VIP2"],
+      "request": {
+        "method": "POST",
+        "headers": [
+          {
+            "Authorization": "上次登录获取的browserCode（Token），若本次已完成登录并创建session，则可不提供此Token。"
+          }
+        ],
+        "params": [
+          {
+            "param": "keyword",
+            "description": "查询关键词",
+            "required": true
+          },
+	  {
+            "param": "knowledgeBase",
+            "description": "知识库名，取值为：news（新闻）、report（脱水券商研报）、short（卖方报告）、short7d（最近7日卖方报告），缺省：short7d",
+            "required": false
+          },
+	  {
+            "param": "searchMethod",
+            "description": "检索模式，取值为：keyword（关键字检索）、semantic（语义检索）、full_text（全文检索）、hybrid（混合检索），缺省：semantic",
+            "required": false
+          },
+	  {
+            "param": "weight",
+            "description": "语意检索的权重设置k（在混合检索模式下生效），取值为：0~1的小数，缺省：0.5",
+            "required": false
+          },
+	  {
+            "param": "rerankEnable",
+            "description": "是否启用rerank（在混合检索模式下生效），取值为：true（语义检索召回+Rerank重排序截断）、false（语义检索+全文检索双路召回），缺省：true",
+            "required": false
+          },
+	  {
+            "param": "topK",
+            "description": "召回数量，取值为1~10的整数，缺省：5",
+            "required": false
+          }
+        ],
+	"params_suggest": "推荐使用参数：searchMethod=hybrid&rerankEnable=true，包含语义检索召回+Rerank重排序截断的混合模式"
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "records": [
+              {
+                "segment": {
+                  "id": "文档片段ID",
+                  "content": "文档片段内容",
+                  "document": {
+                    "id": "片段所属文档ID",
+                    "name": "文档文件名，包含了文档类型和日期等信息"
+		   }
+                },
+                "score": "匹配度评分，不低于0.5"
+              }
+            ],
+            "msg": "",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": [
+          {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "登录信息已丢失或超时",
+              "time": "服务器时间"
+            },
+            "description": "未登录或Token已过期，须重新执行一次登录更新Token"
+          },
+	  {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "你没有权限",
+              "time": "服务器时间"
+            },
+            "description": "无VIP2权限，联系微信 %wechat% 升级VIP2"
+          },
+	  {
+            "content_type": "application/json",
+            "schema_json": {
+              "success": false,
+              "status": "AUT",
+              "data": null,
+              "msg": "你的 VIP2 权限已过期",
+              "time": "服务器时间"
+            },
+            "description": "VIP2包时已到期，请联系微信 %wechat% 续期"
+          }
+        ]
+      }
+    },
+    {
+      "name": "latest_version",
+      "path": "/api/manage/getLatestVersion",
+      "description": "查看最新版本",
+      "authorization": ["everyone"],
+      "request": {
+        "method": "GET",
+        "headers": [],
+        "params": []
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": {
+            "success": true,
+            "status": "SUC",
+            "data": {
+              "latestVersion": "最新版本号，如：1.0.3",
+              "configFilePath": "最新版本的 api config 文件路径"
+            },
+            "msg": "最新API版本",
+            "time": "服务器时间"
+          }
+        },
+        "error_schema": []
+      }
+    },
+    {
+      "name": "download_version",
+      "path": "/versions/shenwa_config_<version>.json",
+      "description": "下载指定版本API JSON文件",
+      "authorization": ["everyone"],
+      "request": {
+        "method": "GET",
+        "headers": [],
+        "params": []
+      },
+      "responses": {
+        "success_schema": {
+          "content_type": "application/json",
+          "schema_json": "shenwa_config_***.json文件，包含本版本Skill的所有功能及接口定义"
+        }
+      }
+    }
+  ],
+  "changelogs": [
+  {
+      "date": "2026-07-18",
+      "version": "1.0.4",
+      "logs": [
+        "【新增】乖离率接口：get_guaili_rates，下载行业乖离率",
+        "【新增】知识库接口：knowledge_search，提供内置知识库检索服务",
+        "【修改】为所有接口添加权限信息说明：authorization，明确允许访问的用户类型"
+      ]
+    },
+    {
+      "date": "2026-05-20",
+      "version": "1.0.3",
+      "logs": [
+        "【新增】报告PDF下载功能",
+        "【新增】报告状态查询接口",
+        "【新增】异步发布报告的轮询机制定义，以便用户及时查看已发报告的结果",
+        "【新增】Skill的使用场景定义，优化了用户交互体验。新增事项包含：（1）触发条件，定义Skill在何种情况下触发；（2）领域术语表，定义Skill中具有特别含义的专用名词，避免OpenClaw出现误读；（3）交互礼仪 / 后处理建议：建议OpenClaw与用户的交互话术和行为模式；（4）成本与限制声明等；（5）Skill元信息等",
+        "【新增】增加报告的error状态，并制定了异常退出逻辑",
+        "【修改】优化了base_url、report_manage、roll_page等定义"
+      ]
+    },
+    {
+      "date": "2026-04-13",
+      "version": "1.0.2",
+      "logs": [
+        "【新增】用户信息接口：user_info，提供用户名、权限、剩余深挖点restPoint以及有效时间expireTime等信息查询",
+        "【新增】收藏/取消收藏报告接口：collect_report，收藏用户感兴趣的报告，以方便回看",
+        "【新增】删除报告接口：delete_report，删除后的报告不在列表中展示"
+      ]
+    }
+  ]
+}

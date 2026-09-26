@@ -1,0 +1,67 @@
+# ==============================================================
+# 预设 · 价值稳健
+# 来源：03A-偏好选项库 · A1 = value
+# 一句话画像：从现金流、资产质量与安全边际出发，宁可错过不可做错
+# 适用：长线配置、绝对收益、受托/家族资金
+# 用法：复制本文件内容，覆盖到 profile.yaml 即可运行
+# ==============================================================
+
+meta:
+  client_name: "<请填写>"
+  preset_name: "价值稳健"
+  based_on: "A1=value"
+  profile_version: "1.0.0"
+  last_updated: "2026-09-25"
+
+identity:
+  primary_style: value            # A1 = ①价值稳健
+  secondary_style: ""             # 次口径：可填 growth 增加成长视角对照
+  horizon: long                   # A2 = ①长期 3~5 年
+  risk_tolerance: balanced        # A3 = ②中性
+  conclusion_bias: conservative   # A4 = ①审慎
+
+overrides:
+  valuation_method: auto          # B1 = ①自动派生 → DCF / PB-ROE / 股息率
+  focus_metrics: profit_quality   # B2 = ②盈利质量
+
+data_weights:                     # B3 = ①基本面主导
+  fundamental: 0.50
+  valuation: 0.20
+  capital_flow: 0.10
+  sentiment_news: 0.15
+  technical: 0.05
+
+shenwa:
+  intensity: baseline             # E1 = ②基准 约 50%
+  report_depth: standard
+  template_preference: []
+  return_full_text: true
+  download_pdf: on_request        # E2 = ②询问后
+  archive_mode: private           # E3 = ①私有保存
+  precheck_balance: true
+
+datasource:
+  market_scope: [A]               # C1 = ①A 股
+  watchlist_mode: core_holding    # C2 = ①核心持仓型
+  watchlist: []
+  cross_check_tolerance: 0.01     # D6 = ②标准 1.0%
+  require_source_annotation: true
+
+output:
+  language: zh                    # D3 = ①中文
+  depth: standard                 # D1 = ②标准
+  format: markdown                # D2 = ①Markdown
+  include_visual: key             # D4 = ②关键图表
+  include_validation_table: full  # D5 = ①完整校验表
+  max_length: 0
+
+corrections: []
+
+# --------------------------------------------------------------
+# 该预设下的典型产出特征
+# --------------------------------------------------------------
+# · 结论摘要必须先列反面证据，再给条件式判断
+# · 估值默认走 DCF / PB-ROE / 股息率，强调安全边际
+# · 财务取数区间拉长至 5 年，弱化短期波动解读
+# · 风险段篇幅为默认的 1.5 倍
+# · 核心关注：自由现金流、ROE、负债率、分红率

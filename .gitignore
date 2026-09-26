@@ -1,0 +1,22 @@
+# ===== 凭据与令牌：绝对不允许进入仓库 =====
+.shenwa_token
+**/.shenwa_token
+shenwa_credentials.json
+**/shenwa_credentials.json
+!shenwa_credentials.example.json
+
+# ===== 本地元数据（不应分发）=====
+.created-by-session
+**/.created-by-session
+
+# ===== Python 缓存 =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ===== 系统与编辑器 =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

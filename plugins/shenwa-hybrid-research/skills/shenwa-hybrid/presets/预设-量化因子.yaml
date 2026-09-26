@@ -1,0 +1,75 @@
+# ==============================================================
+# 预设 · 量化因子
+# 来源：03A-偏好选项库 · A1 = quant
+# 一句话画像：从因子暴露与统计规律出发，强调可回测、可复现
+# 适用：组合构建、因子研究、系统化投资
+# 用法：复制本文件内容，覆盖到 profile.yaml 即可运行
+# ==============================================================
+
+meta:
+  client_name: "<请填写>"
+  preset_name: "量化因子"
+  based_on: "A1=quant"
+  profile_version: "1.0.0"
+  last_updated: "2026-09-25"
+
+identity:
+  primary_style: quant            # A1 = ④量化因子
+  secondary_style: ""             # 次口径：可填 value 增加基本面锚
+  horizon: medium                 # A2 = ②中期 1~3 年
+  risk_tolerance: balanced        # A3 = ②中性
+  conclusion_bias: neutral        # A4 = ②中性
+
+overrides:
+  valuation_method: auto          # B1 = ①自动派生 → 因子分位
+  focus_metrics: follow_style     # B2 = ①跟随风格
+
+data_weights:                     # B3 = ②均衡
+  fundamental: 0.35
+  valuation: 0.25
+  capital_flow: 0.15
+  sentiment_news: 0.15
+  technical: 0.10
+
+shenwa:
+  # E1 = ①轻量 约 30%
+  # 【2026-09-25 对照实验修正】本画像原设 baseline(50%)，实测后下调为 light。
+  # 原因：深挖模板库以定性分析为主，对因子暴露/分位/回测支撑不足；
+  #       P4 组实测质量四组最差（2 处量级级错误 + 1 处方向性误判）。
+  # 定位：深挖仅负责"因子背后的经济逻辑解释"，全部数字与因子暴露由数据源承担。
+  intensity: light
+  report_depth: standard
+  template_preference: []
+  return_full_text: true
+  download_pdf: on_request        # E2 = ②询问后
+  archive_mode: private           # E3 = ①私有保存
+  precheck_balance: true
+
+datasource:
+  market_scope: [A]               # C1 = ①A 股
+  watchlist_mode: sector_watch    # C2 = ②行业观察型
+  watchlist: []
+  cross_check_tolerance: 0.005    # D6 = ③严格 0.5%（因子研究对数字敏感）
+  require_source_annotation: true
+
+output:
+  language: zh                    # D3 = ①中文
+  depth: standard                 # D1 = ②标准
+  format: table                   # D2 = ②表格清单（因子研究以表为主）
+  include_visual: full            # D4 = ③全量图表（需要分布与分位图）
+  include_validation_table: full  # D5 = ①完整校验表
+  max_length: 0
+
+corrections: []
+
+# --------------------------------------------------------------
+# 该预设下的典型产出特征
+# --------------------------------------------------------------
+# · 输出以表格与图表为主，叙述性文字压缩
+# · 数字校验采用 0.5% 严格阈值，逐项追平
+# · 核心关注：因子IC、估值分位、波动率、流动性
+# · 深挖承担"因子背后的经济逻辑解释"，数据源承担全部分位与暴露计算
+#
+# 数据源契约提示：本预设对 D6/D7 两类数据源能力（标的筛选、宏观与
+# 行业数据）依赖较重，客户端需确认这两类能力可用，否则路由层会将
+# 相关子任务降级并提示。

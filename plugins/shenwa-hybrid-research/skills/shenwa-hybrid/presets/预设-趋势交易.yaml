@@ -1,0 +1,72 @@
+# ==============================================================
+# 预设 · 趋势交易
+# 来源：03A-偏好选项库 · A1 = trend
+# 一句话画像：跟随量价与资金，跟随趋势而非预测基本面
+# 适用：中短线交易、板块轮动、事件驱动
+# 注意：本预设 E1 = light，实际配比约为 深挖 30% / 数据源 70%，
+#       已按 01-模式总纲 的浮动规则在允许区间内，无需额外声明。
+# 用法：复制本文件内容，覆盖到 profile.yaml 即可运行
+# ==============================================================
+
+meta:
+  client_name: "<请填写>"
+  preset_name: "趋势交易"
+  based_on: "A1=trend"
+  profile_version: "1.0.0"
+  last_updated: "2026-09-25"
+
+identity:
+  primary_style: trend            # A1 = ③趋势交易
+  secondary_style: ""             # 次口径：可填 quant 增加因子验证视角
+  horizon: short                  # A2 = ③短期 周~季
+  risk_tolerance: aggressive      # A3 = ③进取
+  conclusion_bias: aggressive     # A4 = ③积极
+
+overrides:
+  valuation_method: auto          # B1 = ①自动派生 → 相对强弱 / 量价
+  focus_metrics: capital_sentiment # B2 = ④资金情绪
+
+data_weights:                     # B3 = ③交易面主导
+  fundamental: 0.20
+  valuation: 0.15
+  capital_flow: 0.30
+  sentiment_news: 0.25
+  technical: 0.10
+
+shenwa:
+  intensity: light                # E1 = ①轻量 约 30%
+  report_depth: brief             # 交易场景不需要长报告
+  template_preference: []
+  return_full_text: true
+  download_pdf: never             # E2 = ③不下载（快速取用，不归档）
+  archive_mode: discard           # E3 = ③不归档
+  precheck_balance: false
+
+datasource:
+  market_scope: [A]               # C1 = ①A 股
+  watchlist_mode: sector_watch    # C2 = ②行业观察型
+  watchlist: []
+  cross_check_tolerance: 0.015    # D6 = ①宽松 1.5%
+  require_source_annotation: true
+
+output:
+  language: zh                    # D3 = ①中文
+  depth: brief                    # D1 = ①摘要式
+  format: markdown                # D2 = ①Markdown
+  include_visual: key             # D4 = ②关键图表
+  include_validation_table: mandatory_only  # D5 = ②仅强制核对项
+  max_length: 0
+
+corrections: []
+
+# --------------------------------------------------------------
+# 该预设下的典型产出特征
+# --------------------------------------------------------------
+# · 结论摘要先给方向判断，再列触发条件与失效条件
+# · 数据更新频率加密，行情类精确到分钟
+# · 核心关注：趋势动量、成交额、资金流向、板块强度
+# · 深挖仅承担"观点定调"，主体由行情与资金数据构成
+#
+# 一致性提示：本预设 D1=brief 与 E1=light 匹配，无冲突。
+# 若客户将 D1 改为 dd（尽调级），建议同步将 E1 改为 baseline，
+# 否则会被一致性检查提示为低效配置。
