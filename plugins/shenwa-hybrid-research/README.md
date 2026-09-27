@@ -1,4 +1,4 @@
-# Shenwa Hybrid Research · 深挖混合投研模式
+# True Shenwa Integrated Research · 真深挖综合研究
 
 把「AI 深度研究报告能力（深挖 Shenwa）」与「结构化金融数据能力（泛金融数据 Skill）」组合成一个职责清晰、可校验、可个性化、可复制的投研智能体模式。
 

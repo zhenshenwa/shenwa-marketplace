@@ -27,9 +27,9 @@
     {
       "name": "shenwa-hybrid-research",
       "source": "./plugins/shenwa-hybrid-research",
-      "description": "以深挖出分析主体、数据源做事实校验的 50/50 分工完成单项投研任务，按客户偏好裁剪输出，附逐项校验表。",
-      "description_en": "Runs single-task investment research on a 50/50 split — Shenwa supplies the analysis body, a data source supplies the fact base and validation table — personalized via an externalized preference file.",
-      "version": "1.0.2",
+      "description": "真深挖综合研究：以深挖出分析主体、数据源做事实校验的 50/50 分工完成单项投研任务，按客户偏好裁剪输出，附逐项校验表。",
+      "description_en": "True Shenwa Integrated Research: single-task investment research on a 50/50 split — Shenwa supplies the analysis body, a data source supplies the fact base and validation table — personalized via an externalized preference file.",
+      "version": "1.0.3",
       "category": "finance",
       "author": {
         "name": "shenwa",

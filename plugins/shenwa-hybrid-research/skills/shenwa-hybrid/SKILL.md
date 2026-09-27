@@ -1,11 +1,11 @@
 ---
 name: shenwa-hybrid
-description: 深挖混合投研模式（Hybrid Investment Research Mode）。以「深挖出分析主体、数据源做事实校验」的 50/50 分工，完成单项投研任务；客户通过外置偏好文件个性化，输出附校验表并完整引用深挖原文。触发词：混合投研、投研模式、深挖+数据源、50/50、偏好配置、单项任务、校验表、投研智能体模式。
-description_zh: "深挖混合投研模式（四层架构 · 50/50 分工 · 偏好外置）"
+description: 真深挖综合研究（True Shenwa Integrated Research）。以「深挖出分析主体、数据源做事实校验」的 50/50 分工，完成单项投研任务；客户通过外置偏好文件个性化，输出附校验表并完整引用深挖原文。触发词：真深挖、综合研究、混合投研、投研模式、深挖+数据源、50/50、偏好配置、单项任务、校验表、投研智能体模式。
+description_zh: "真深挖综合研究（四层架构 · 50/50 分工 · 偏好外置）"
 version: 1.0.1
 ---
 
-# 深挖混合投研模式（Hybrid Investment Research Mode）
+# 真深挖综合研究（True Shenwa Integrated Research）
 
 把「AI 深度研究报告能力（深挖 Shenwa）」与「结构化金融数据能力（泛金融数据 Skill）」组合成一个**职责清晰、可校验、可个性化、可复制**的投研智能体模式。
 

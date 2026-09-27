@@ -1,6 +1,6 @@
 {
   "name": "shenwa-hybrid-research",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Hybrid investment research mode: Shenwa supplies the analysis body while a data-source skill supplies the fact base and cross-check layer, under a 50/50 split with customer preference externalized.",
   "author": {
     "name": "shenwa",
@@ -13,16 +13,16 @@
   "agentName": "shenwa-hybrid-research",
 
   "displayName": {
-    "en": "Shenwa Hybrid Research",
-    "zh": "深挖混合投研模式"
+    "en": "True Shenwa Integrated Research",
+    "zh": "真深挖综合研究"
   },
   "profession": {
-    "en": "Hybrid Investment Research Analyst",
-    "zh": "混合投研模式分析师"
+    "en": "Integrated Investment Research Analyst",
+    "zh": "综合投研分析师"
   },
   "displayDescription": {
-    "en": "Runs single-task investment research on a 50/50 split — Shenwa supplies the analysis body, a data source supplies the fact base and validation table — personalized through an externalized preference file.",
-    "zh": "以深挖出分析主体、数据源做事实校验的50/50分工完成单项投研任务，按客户偏好裁剪输出，附校验表。"
+    "en": "Runs single-task investment research on a 50/50 split: Shenwa supplies the analysis body while a data source supplies the fact base and cross-check layer, delivered as a validation table.",
+    "zh": "以「深挖出分析主体、数据源做事实校验」的 50/50 分工完成单项投研任务，按客户偏好裁剪输出，每个数字都附逐项校验表。"
   },
   "avatar": "avatars/expert.png",
   "categoryId": "08-FinanceInvestment",
