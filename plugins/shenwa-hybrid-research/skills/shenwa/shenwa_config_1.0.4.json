@@ -3,6 +3,17 @@
   "cn_name": "深挖",
   "version": "1.0.4",
   "description": "Shenwa（深挖） - AI深度调查报告工具",
+  "_local_patch": {
+    "date": "2026-09-29",
+    "scope": "本地修正：移除邀请码依赖",
+    "reason": "官方 1.0.4 配置把 login 的 inviteCode 标为 required、并在 auth.user_credentials 中要求输入邀请码，但接口层实际早已不校验（2026-09-27 实测：只传 userID 即返回 success + browserCode）。二者不一致会导致使用者被反复索要邀请码，而新用户并无邀请码可填。",
+    "changed": [
+      "auth.user_credentials：删除 inviteCode 项",
+      "work_flows.login.step1：去掉『手机号和邀请码』表述",
+      "api_endpoints[login].request.params[inviteCode].required：true → false，并标注已废弃"
+    ],
+    "warning": "若官方发布更高版本（GET /api/manage/getLatestVersion 的 latestVersion > 1.0.4）并按新版覆盖本文件、SKILL.md、shenwa_api.py，**必须重新应用本补丁**，否则邀请码问题会复发。"
+  },
   "base_url": {
     "primary": "https://www.shenwa.top",
     "fallbacks": ["http://8.130.17.247:8088"],
@@ -15,9 +26,9 @@
      "session_token_storage": "memory_or_local_file",
      "session_token_ttl_hint": "until 401",
      "user_credentials": [
-       { "key": "phone", "prompt": "请输入注册手机号" },
-       { "key": "inviteCode", "prompt": "请输入邀请码" }
+       { "key": "phone", "prompt": "请输入注册手机号" }
      ],
+     "user_credentials_note": "登录只需注册手机号，邀请码已不再需要（2026-09-27 实测：只传 userID 即登录成功）。**切勿向用户索要邀请码**。若手机号提交后仍返回失败，说明该号未开通或权限不足，请联系微信 %wechat% 开号/充值。",
      "user_types": [
        { "name": "VIP", "prompt": "深挖点付费用户" },
        { "name": "VIP2", "prompt": "深挖点付费+接口包时付费用户" }
@@ -91,7 +102,7 @@
         "step1": {
           "action": "load_credentials",
           "source": "auth.user_credentials",
-          "description": "从本地存储读取手机号和邀请码；若不存在，按 auth.user_credentials 的 prompt 引导用户首次输入并保存"
+          "description": "从本地存储读取注册手机号；若不存在，按 auth.user_credentials 的 prompt 引导用户首次输入并保存。只需手机号，**不要索要邀请码**"
         },
         "step2": {
           "action": "request_api",
@@ -195,8 +206,8 @@
           },
           {
             "param": "inviteCode",
-            "description": "邀请码（随账号发放，临时方案，正式版后将取消）",
-            "required": true
+            "description": "【已废弃，勿索要】邀请码。自 2026-09-27 实测起接口不再校验，可完全省略；该字段仅为向后兼容保留，传了也不报错。",
+            "required": false
           }
         ]
       },

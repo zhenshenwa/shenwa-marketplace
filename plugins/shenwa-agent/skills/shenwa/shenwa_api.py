@@ -18,11 +18,16 @@
   python shenwa_api.py latest_version
 
 凭据配置（本脚本不内置任何账号信息，每人用自己的账号）:
-  方式1 环境变量：SHENWA_USER_ID=注册手机号  SHENWA_INVITE_CODE=邀请码
+  方式1 环境变量：SHENWA_USER_ID=注册手机号
   方式2 本地文件：~/.workbuddy/shenwa_credentials.json
-                  {"userID": "注册手机号", "inviteCode": "邀请码"}
+                  {"userID": "注册手机号"}
   也可用 SHENWA_CRED_FILE 指定其它凭据文件路径。
   凭据文件位于包外，不会被随包分发。
+
+  ⚠️ 登录**只需注册手机号，不需要邀请码**（2026-09-27 实测：只传
+  {"userID": "..."} 即返回 success + browserCode）。旧配置里若仍有
+  inviteCode，会被兼容提交（服务端不校验）；缺失也不会再报错。
+  **不要向使用者索要邀请码。**
 """
 import json
 import os
@@ -36,6 +41,7 @@ BASE_FALLBACK = "http://8.130.17.247:8088"
 
 # 凭据一律从包外读取，严禁写回本文件（本文件会随专家包一起分发）
 CRED_ENV_USER = "SHENWA_USER_ID"
+# 兼容保留：邀请码已不再需要（接口不校验）；仅在调用方仍配置时才一并提交
 CRED_ENV_CODE = "SHENWA_INVITE_CODE"
 CRED_FILE_ENV = "SHENWA_CRED_FILE"
 CRED_FILE_DEFAULT = os.path.join(os.path.expanduser("~"), ".workbuddy", "shenwa_credentials.json")
@@ -66,16 +72,30 @@ STRING_PARAMS = {"tid"}
 QUERY_PARAM_APIS = {"knowledge_search"}
 
 
+def _cred(uid, code=""):
+    """组装登录凭据。
+
+    2026-09-27 实测：接口层已不再校验邀请码，**只需注册手机号**即可登录。
+    邀请码仅在调用方仍显式配置时才一并提交（向后兼容），缺失不影响登录。
+    """
+    d = {"userID": uid}
+    if code:
+        d["inviteCode"] = code
+    return d
+
+
 def load_cred():
     """解析深挖账号凭据，优先级：环境变量 > 包外本地配置文件。
 
     包内不含任何账号信息，每位使用者需自行提供凭据；缺少时抛出带
     配置指引的错误，而不是回退到某个内置账号。
+
+    ⚠️ **只需注册手机号，不要向使用者索要邀请码**（接口已不校验）。
     """
     uid = os.environ.get(CRED_ENV_USER, "").strip()
     code = os.environ.get(CRED_ENV_CODE, "").strip()
-    if uid and code:
-        return {"userID": uid, "inviteCode": code}
+    if uid:
+        return _cred(uid, code)
 
     path = os.environ.get(CRED_FILE_ENV, "").strip() or CRED_FILE_DEFAULT
     if os.path.isfile(path):
@@ -84,17 +104,18 @@ def load_cred():
                 d = json.load(f)
             u = str(d.get("userID", "")).strip()
             c = str(d.get("inviteCode", "")).strip()
-            if u and c:
-                return {"userID": u, "inviteCode": c}
+            if u:
+                return _cred(u, c)
         except Exception as e:
             raise RuntimeError("凭据文件解析失败 (%s): %s" % (path, e))
 
     raise RuntimeError(
-        "未配置深挖账号凭据。任选一种方式后重试：\n"
-        "  1) 设置环境变量 %s（注册手机号）与 %s（邀请码）\n"
-        "  2) 创建文件 %s，内容为 {\"userID\": \"注册手机号\", \"inviteCode\": \"邀请码\"}\n"
-        "  也可用 %s 指定其它凭据文件路径。"
-        % (CRED_ENV_USER, CRED_ENV_CODE, CRED_FILE_DEFAULT, CRED_FILE_ENV)
+        "未配置深挖账号凭据（**只需注册手机号，不需要邀请码**）。任选一种方式后重试：\n"
+        "  1) 设置环境变量 %s = 注册手机号\n"
+        "  2) 创建文件 %s，内容为 {\"userID\": \"注册手机号\"}\n"
+        "  也可用 %s 指定其它凭据文件路径。\n"
+        "  还没有账号？联系微信 shenwa4119（公众号：真深挖者也）。"
+        % (CRED_ENV_USER, CRED_FILE_DEFAULT, CRED_FILE_ENV)
     )
 
 

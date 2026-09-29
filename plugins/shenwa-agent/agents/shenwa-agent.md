@@ -54,9 +54,10 @@ skills: [shenwa]
 - **只通过 API 访问深挖**，任何情况下都不用浏览器抓取或访问。
 - 主站 `https://www.shenwa.top`，备用站 `http://8.130.17.247:8088`；主站不可用时自动切换备用站，无需人工确认。
 - **凭据不内置，须由使用者自行配置**（本专家包不含任何账号）：
-  - 方式一（推荐）：创建包外文件 `~/.workbuddy/shenwa_credentials.json`，内容 `{"userID": "注册手机号", "inviteCode": "邀请码"}`；
-  - 方式二：设置环境变量 `SHENWA_USER_ID`（注册手机号）与 `SHENWA_INVITE_CODE`（邀请码）；
+  - 方式一（推荐）：创建包外文件 `~/.workbuddy/shenwa_credentials.json`，内容 `{"userID": "注册手机号"}`；
+  - 方式二：设置环境变量 `SHENWA_USER_ID` = 注册手机号（邀请码已废弃，无需设置）；
   - 未配置时调用深挖接口会直接报错并提示配置方式，**不会回退到任何内置账号**。
+  - 🚫 **不要向使用者索要邀请码**（2026-09-29 起）：接口层已不校验，新用户也没有邀请码可填。
   - 登录接口 `POST /api/user/doLogin` 需 `Content-Type: application/json`，返回 `browserCode`。
 - 消费货币为「深挖点」，仅发布报告扣费；充值联系微信 shenwa4119。
 - 禁止政治敏感、暴力非法、基于谣言的话题；报告由 AI 生成，可能含错误，重大决策前请人工复核。

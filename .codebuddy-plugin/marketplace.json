@@ -15,13 +15,18 @@
       "source": "./plugins/shenwa-agent",
       "description": "基于深挖平台生成公司、行业、事件深度调查报告，覆盖市场复盘、卖方日报、乖离率与知识库检索。",
       "description_en": "Generates deep-dive investment research reports, market recaps, sell-side dailies and bias-rate analysis via the Shenwa API.",
-      "version": "1.0.5",
+      "version": "1.0.6",
       "category": "finance",
       "author": {
         "name": "shenwa",
         "email": "shenwa4119@wechat.com"
       },
-      "keywords": ["deep-research", "industry-analysis", "company-research", "finance"],
+      "keywords": [
+        "deep-research",
+        "industry-analysis",
+        "company-research",
+        "finance"
+      ],
       "license": ""
     },
     {
@@ -29,13 +34,18 @@
       "source": "./plugins/shenwa-hybrid-research",
       "description": "真深挖综合研究：以深挖出分析主体、数据源做事实校验的 50/50 分工完成单项投研任务，按客户偏好裁剪输出，附逐项校验表。",
       "description_en": "True Shenwa Integrated Research: single-task investment research on a 50/50 split — Shenwa supplies the analysis body, a data source supplies the fact base and validation table — personalized via an externalized preference file.",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "category": "finance",
       "author": {
         "name": "shenwa",
         "email": "shenwa4119@wechat.com"
       },
-      "keywords": ["hybrid-research", "data-validation", "preference-config", "finance"],
+      "keywords": [
+        "hybrid-research",
+        "data-validation",
+        "preference-config",
+        "finance"
+      ],
       "license": ""
     }
   ]

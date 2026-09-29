@@ -1,17 +1,20 @@
 {
   "name": "shenwa-hybrid-research",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Hybrid investment research mode: Shenwa supplies the analysis body while a data-source skill supplies the fact base and cross-check layer, under a 50/50 split with customer preference externalized.",
   "author": {
     "name": "shenwa",
     "email": "shenwa4119@wechat.com"
   },
-  "agents": ["./agents/shenwa-hybrid-research.md"],
-  "skills": ["./skills/shenwa", "./skills/shenwa-hybrid"],
-
+  "agents": [
+    "./agents/shenwa-hybrid-research.md"
+  ],
+  "skills": [
+    "./skills/shenwa",
+    "./skills/shenwa-hybrid"
+  ],
   "expertType": "agent",
   "agentName": "shenwa-hybrid-research",
-
   "displayName": {
     "en": "True Shenwa Integrated Research",
     "zh": "真深挖综合研究"
@@ -32,13 +35,31 @@
   },
   "plugin": "shenwa-hybrid-research",
   "tags": [
-    { "en": "Hybrid Research", "zh": "混合投研" },
-    { "en": "Data Validation", "zh": "数据校验" },
-    { "en": "Preference Config", "zh": "偏好配置" }
+    {
+      "en": "Hybrid Research",
+      "zh": "混合投研"
+    },
+    {
+      "en": "Data Validation",
+      "zh": "数据校验"
+    },
+    {
+      "en": "Preference Config",
+      "zh": "偏好配置"
+    }
   ],
   "quickPrompts": [
-    { "en": "Run a company deep-dive on CATL under the 'value & steady' preference, with a validation table", "zh": "以「价值稳健」偏好，对宁德时代做一份公司深度研究，附校验表" },
-    { "en": "Compare the battery business profitability of BYD and CATL", "zh": "帮我对比比亚迪与宁德时代的电池业务盈利能力" },
-    { "en": "Track abnormal moves in my watchlist under the 'trend trading' preference and flag numbers that need re-checking", "zh": "用「趋势交易」偏好跟踪我关注池的异动，并说明哪些数字需要复核" }
+    {
+      "en": "Run a company deep-dive on CATL under the 'value & steady' preference, with a validation table",
+      "zh": "以「价值稳健」偏好，对宁德时代做一份公司深度研究，附校验表"
+    },
+    {
+      "en": "Compare the battery business profitability of BYD and CATL",
+      "zh": "帮我对比比亚迪与宁德时代的电池业务盈利能力"
+    },
+    {
+      "en": "Track abnormal moves in my watchlist under the 'trend trading' preference and flag numbers that need re-checking",
+      "zh": "用「趋势交易」偏好跟踪我关注池的异动，并说明哪些数字需要复核"
+    }
   ]
 }

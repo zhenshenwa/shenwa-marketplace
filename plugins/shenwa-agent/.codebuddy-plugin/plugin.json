@@ -1,17 +1,19 @@
 {
   "name": "shenwa-agent",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Shenwa (Shenwa) AI deep-dive investment research report expert, generating structured research reports via API.",
   "author": {
     "name": "shenwa",
     "email": "shenwa4119@wechat.com"
   },
-  "agents": ["./agents/shenwa-agent.md"],
-  "skills": ["./skills/shenwa"],
-
+  "agents": [
+    "./agents/shenwa-agent.md"
+  ],
+  "skills": [
+    "./skills/shenwa"
+  ],
   "expertType": "agent",
   "agentName": "shenwa-agent",
-
   "displayName": {
     "en": "Shenwa AI Research",
     "zh": "深挖AI投研分析"
@@ -32,13 +34,31 @@
   },
   "plugin": "shenwa-agent",
   "tags": [
-    { "en": "Deep Research", "zh": "深度调研" },
-    { "en": "Industry Analysis", "zh": "行业分析" },
-    { "en": "Company Research", "zh": "公司研究" }
+    {
+      "en": "Deep Research",
+      "zh": "深度调研"
+    },
+    {
+      "en": "Industry Analysis",
+      "zh": "行业分析"
+    },
+    {
+      "en": "Company Research",
+      "zh": "公司研究"
+    }
   ],
   "quickPrompts": [
-    { "en": "Research CATL's recent moves and generate a company research report", "zh": "帮我深挖一下宁德时代最近的动作，生成一份公司研究报告" },
-    { "en": "Give me today's market recap and sell-side daily report", "zh": "给我今天最新的深挖市场复盘和全市场卖方日报" },
-    { "en": "Check the latest industry bias rates", "zh": "查一下最新的行业乖离率数据" }
+    {
+      "en": "Research CATL's recent moves and generate a company research report",
+      "zh": "帮我深挖一下宁德时代最近的动作，生成一份公司研究报告"
+    },
+    {
+      "en": "Give me today's market recap and sell-side daily report",
+      "zh": "给我今天最新的深挖市场复盘和全市场卖方日报"
+    },
+    {
+      "en": "Check the latest industry bias rates",
+      "zh": "查一下最新的行业乖离率数据"
+    }
   ]
 }
