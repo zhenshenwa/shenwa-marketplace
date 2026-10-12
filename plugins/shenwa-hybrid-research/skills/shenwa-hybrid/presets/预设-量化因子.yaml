@@ -49,18 +49,23 @@ datasource:
   market_scope: [A]               # C1 = ①A 股
   watchlist_mode: sector_watch    # C2 = ②行业观察型
   watchlist: []
-  cross_check_tolerance: 0.005    # D6 = ③严格 0.5%（因子研究对数字敏感）
+  cross_check_tolerance: 0.005    # F6 = ③严格 0.5%（因子研究对数字敏感）
   require_source_annotation: true
 
 output:
-  language: zh                    # D3 = ①中文
-  depth: standard                 # D1 = ②标准
-  format: table                   # D2 = ②表格清单（因子研究以表为主）
-  include_visual: full            # D4 = ③全量图表（需要分布与分位图）
-  include_validation_table: full  # D5 = ①完整校验表
+  language: zh                    # F3 = ①中文
+  depth: standard                 # F1 = ②标准
+  format: table                   # F2 = ②表格清单（因子研究以表为主）
+  include_visual: full            # F4 = ③全量图表（需要分布与分位图）
+  include_validation_table: full  # F5 = ①完整校验表
   max_length: 0
 
 corrections: []
+
+# --------------------------------------------------------------
+# v1.9.0 提示：本预设的 A3/A4 属**表达偏好**，只改"怎么说"；
+# 事实、关键数字、证据状态与结论判定一律不变，情景概率与权重也不因此改变。
+# --------------------------------------------------------------
 
 # --------------------------------------------------------------
 # 该预设下的典型产出特征
@@ -70,6 +75,6 @@ corrections: []
 # · 核心关注：因子IC、估值分位、波动率、流动性
 # · 深挖承担"因子背后的经济逻辑解释"，数据源承担全部分位与暴露计算
 #
-# 数据源契约提示：本预设对 D6/D7 两类数据源能力（标的筛选、宏观与
+# 数据源契约提示：本预设对 **D6/D7 两类数据能力**（标的筛选、宏观与行业数据）
 # 行业数据）依赖较重，客户端需确认这两类能力可用，否则路由层会将
 # 相关子任务降级并提示。

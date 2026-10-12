@@ -1,7 +1,7 @@
 {
   "name": "shenwa-marketplace",
-  "description": "深挖（Shenwa）× 泛金融数据源的投研专家市场：提供深度调查报告能力与混合投研模式。",
-  "description_en": "Shenwa deep-research investment expert marketplace: deep-dive report generation and a hybrid research mode with a fact-validation layer.",
+  "description": "深挖（Shenwa）× 泛金融数据源的投研专家市场：提供深度调查报告能力与综合研究模式。",
+  "description_en": "Shenwa deep-research investment expert marketplace: deep-dive report generation and an integrated research mode with a fact-validation layer.",
   "owner": {
     "name": "shenwa",
     "email": "shenwa4119@wechat.com"
@@ -15,7 +15,7 @@
       "source": "./plugins/shenwa-agent",
       "description": "基于深挖平台生成公司、行业、事件深度调查报告，覆盖市场复盘、卖方日报、乖离率与知识库检索。",
       "description_en": "Generates deep-dive investment research reports, market recaps, sell-side dailies and bias-rate analysis via the Shenwa API.",
-      "version": "1.0.6",
+      "version": "1.1.7",
       "category": "finance",
       "author": {
         "name": "shenwa",
@@ -32,9 +32,9 @@
     {
       "name": "shenwa-hybrid-research",
       "source": "./plugins/shenwa-hybrid-research",
-      "description": "真深挖综合研究：以深挖出分析主体、数据源做事实校验的 50/50 分工完成单项投研任务，按客户偏好裁剪输出，附逐项校验表。",
-      "description_en": "True Shenwa Integrated Research: single-task investment research on a 50/50 split — Shenwa supplies the analysis body, a data source supplies the fact base and validation table — personalized via an externalized preference file.",
-      "version": "1.0.4",
+      "description": "真深挖综合研究 v1.15.1（接入深挖接口 1.0.6）：融合深挖AI与金融数据，支持公司研究、行业比较、趋势监测与关键数据核验。",
+      "description_en": "v1.15.1 · Shenwa API 1.0.6 | Combines Shenwa AI with financial data to support company research, sector comparison, trend monitoring, and key-data verification, with a per-item validation table.",
+      "version": "1.15.1",
       "category": "finance",
       "author": {
         "name": "shenwa",

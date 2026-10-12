@@ -1,7 +1,7 @@
 {
   "name": "shenwa-hybrid-research",
-  "version": "1.0.4",
-  "description": "Hybrid investment research mode: Shenwa supplies the analysis body while a data-source skill supplies the fact base and cross-check layer, under a 50/50 split with customer preference externalized.",
+  "version": "1.15.1",
+  "description": "真深挖综合研究 v1.15.1（接入深挖接口 1.0.6）：融合深挖AI与金融数据，支持公司研究、行业比较、趋势监测与关键数据核验。",
   "author": {
     "name": "shenwa",
     "email": "shenwa4119@wechat.com"
@@ -24,8 +24,8 @@
     "zh": "综合投研分析师"
   },
   "displayDescription": {
-    "en": "Runs single-task investment research on a 50/50 split: Shenwa supplies the analysis body while a data source supplies the fact base and cross-check layer, delivered as a validation table.",
-    "zh": "以「深挖出分析主体、数据源做事实校验」的 50/50 分工完成单项投研任务，按客户偏好裁剪输出，每个数字都附逐项校验表。"
+    "en": "v1.15.1 · Shenwa API 1.0.6 | Combines Shenwa AI with financial data to support company research, sector comparison, trend monitoring, and key-data verification, with a per-item validation table.",
+    "zh": "v1.15.1 · 接入深挖接口 1.0.6 ｜ 深挖写分析、数据源核数字，附校验表。"
   },
   "avatar": "avatars/expert.png",
   "categoryId": "08-FinanceInvestment",
@@ -36,8 +36,8 @@
   "plugin": "shenwa-hybrid-research",
   "tags": [
     {
-      "en": "Hybrid Research",
-      "zh": "混合投研"
+      "en": "Integrated Research",
+      "zh": "综合研究"
     },
     {
       "en": "Data Validation",

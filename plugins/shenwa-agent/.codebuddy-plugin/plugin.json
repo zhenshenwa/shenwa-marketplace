@@ -1,7 +1,7 @@
 {
   "name": "shenwa-agent",
-  "version": "1.0.6",
-  "description": "Shenwa (Shenwa) AI deep-dive investment research report expert, generating structured research reports via API.",
+  "version": "1.1.7",
+  "description": "深挖AI投研分析（Shenwa AI Research）：基于深挖平台生成公司、行业、事件深度调查报告，覆盖市场复盘、卖方日报、乖离率与知识库检索。",
   "author": {
     "name": "shenwa",
     "email": "shenwa4119@wechat.com"

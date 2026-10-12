@@ -236,12 +236,13 @@ def main():
             write_plugin_version(dst, new_ver)
             print(f"  版本 {old_ver} -> {new_ver}")
 
-    if not args.no_bump:
-        changed = sync_marketplace_versions()
-        if changed:
-            print("\nmarketplace.json 版本号已对齐：")
-            for name, old, new in changed:
-                print(f"  {name}: {old} -> {new}")
+    # 版本号对齐是无条件动作：--no-bump 只表示「不递增版本」，不应连对齐一起跳过，
+    # 否则手动改过 plugin.json 版本后，marketplace.json 会一直停在旧版本。
+    changed = sync_marketplace_versions()
+    if changed:
+        print("\nmarketplace.json 版本号已对齐：")
+        for name, old, new in changed:
+            print(f"  {name}: {old} -> {new}")
 
     print("\n" + "=" * 62)
     print("凭据扫描")

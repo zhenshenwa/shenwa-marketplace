@@ -9,6 +9,11 @@ shenwa_credentials.json
 .created-by-session
 **/.created-by-session
 
+# ===== 仅本地使用，绝不进入 git 市场 =====
+dist/
+maintenance/
+维护备份/
+
 # ===== Python 缓存 =====
 __pycache__/
 *.py[cod]

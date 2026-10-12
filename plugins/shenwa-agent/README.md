@@ -12,6 +12,7 @@ Agent 型（单个 AI 专家）
 - **全市场报告**：查看公共/私有/收藏报告列表，读取报告详情原文。
 - **市场复盘 & 卖方日报**：获取最新深挖市场快报与全市场卖方日报。
 - **乖离率分析**：下载行业乖离率数据（VIP2）。
+- **全市场横截面扫描（v1.1.3 新增口径）**：`get_right_side` 一次调用覆盖 **62 个行业与主题指数**的阶段 / 迁移 / 否决 / 资格字段，**0 点、秒级、不发报告**，产出「升级 / 破坏 / 临界 / 否决」四张表 + 计数（需 ADM/VIP2）。
 - **知识库检索**：检索新闻、脱水券商研报、卖方报告（VIP2）。
 - **PDF 下载**：直接下载已排版好的报告 PDF。
 
@@ -20,6 +21,7 @@ Agent 型（单个 AI 专家）
 - 帮我深挖一下宁德时代最近的动作，生成一份公司研究报告
 - 给我今天最新的深挖市场复盘和全市场卖方日报
 - 查一下最新的行业乖离率数据
+- 今天哪些行业与主题指数出现了右侧确认（横截面直取：0 点、秒级、出四张表）
 
 ## 头像
 
@@ -62,8 +64,10 @@ Agent 型（单个 AI 专家）
 将专家包目录放到专家目录下：
 
 ```
-C:\Users\songj\.workbuddy\plugins\marketplaces\my-experts\plugins/shenwa-agent/
+%USERPROFILE%\.workbuddy\plugins\marketplaces\my-experts\plugins\shenwa-agent\
 ```
+
+<span style="color:#888">Windows 上即 `C:\Users\你的用户名\.workbuddy\plugins\marketplaces\my-experts\plugins\shenwa-agent\`</span>
 
 然后运行注册命令使其可见：
 

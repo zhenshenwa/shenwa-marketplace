@@ -44,18 +44,23 @@ datasource:
   market_scope: [A]               # C1 = ①A 股
   watchlist_mode: theme_tracking  # C2 = ③主题跟踪型（主题投资首选）
   watchlist: []
-  cross_check_tolerance: 0.01     # D6 = ②标准 1.0%
+  cross_check_tolerance: 0.01     # F6 = ②标准 1.0%
   require_source_annotation: true
 
 output:
-  language: zh                    # D3 = ①中文
-  depth: standard                 # D1 = ②标准
-  format: markdown                # D2 = ①Markdown
-  include_visual: key             # D4 = ②关键图表
-  include_validation_table: full  # D5 = ①完整校验表
+  language: zh                    # F3 = ①中文
+  depth: standard                 # F1 = ②标准
+  format: markdown                # F2 = ①Markdown
+  include_visual: key             # F4 = ②关键图表
+  include_validation_table: full  # F5 = ①完整校验表
   max_length: 0
 
 corrections: []
+
+# --------------------------------------------------------------
+# v1.9.0 提示：本预设的 A3/A4 属**表达偏好**，只改"怎么说"；
+# 事实、关键数字、证据状态与结论判定一律不变，情景概率与权重也不因此改变。
+# --------------------------------------------------------------
 
 # --------------------------------------------------------------
 # 该预设下的典型产出特征

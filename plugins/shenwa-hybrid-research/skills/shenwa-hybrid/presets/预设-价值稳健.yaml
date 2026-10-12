@@ -22,6 +22,7 @@ identity:
 
 overrides:
   valuation_method: auto          # B1 = ①自动派生 → DCF / PB-ROE / 股息率
+                                  # v1.6.0：方法按「必要输入 + 适用条件」逐个判定，不按风格强制；单方法在其边界内有效
   focus_metrics: profit_quality   # B2 = ②盈利质量
 
 data_weights:                     # B3 = ①基本面主导
@@ -44,15 +45,15 @@ datasource:
   market_scope: [A]               # C1 = ①A 股
   watchlist_mode: core_holding    # C2 = ①核心持仓型
   watchlist: []
-  cross_check_tolerance: 0.01     # D6 = ②标准 1.0%
+  cross_check_tolerance: 0.01     # F6 = ②标准 1.0%
   require_source_annotation: true
 
 output:
-  language: zh                    # D3 = ①中文
-  depth: standard                 # D1 = ②标准
-  format: markdown                # D2 = ①Markdown
-  include_visual: key             # D4 = ②关键图表
-  include_validation_table: full  # D5 = ①完整校验表
+  language: zh                    # F3 = ①中文
+  depth: standard                 # F1 = ②标准
+  format: markdown                # F2 = ①Markdown
+  include_visual: key             # F4 = ②关键图表
+  include_validation_table: full  # F5 = ①完整校验表
   max_length: 0
 
 corrections: []
@@ -62,6 +63,11 @@ corrections: []
 # --------------------------------------------------------------
 # · 结论摘要必须先列反面证据，再给条件式判断
 # · 估值默认走 DCF / PB-ROE / 股息率，强调安全边际
+# · v1.6.0：DCF 必须先确认现金流与折现率配对（FCFF↔WACC / FCFE↔Ke），
+#   且企业价值经权益调整桥后才给每股价值；缺必要调整项只给边界。
+#   历史 CAGR 外推一律标为预测假设（附期限/理由/敏感性）。
 # · 财务取数区间拉长至 5 年，弱化短期波动解读
-# · 风险段篇幅为默认的 1.5 倍
+# · 风险段呈现更详细（篇幅约 1.5 倍）——**只改呈现，不改变客观判断与情景概率**
 # · 核心关注：自由现金流、ROE、负债率、分红率
+# · ⚠️ v1.9.0：本预设的 A3/A4 属**表达偏好**，只改"怎么说"；
+#   事实、关键数字、证据状态、结论判定一律不变，也不会提高任何情景的概率或权重

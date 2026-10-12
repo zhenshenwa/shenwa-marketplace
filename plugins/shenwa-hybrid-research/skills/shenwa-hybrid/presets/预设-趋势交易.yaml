@@ -46,15 +46,15 @@ datasource:
   market_scope: [A]               # C1 = ①A 股
   watchlist_mode: sector_watch    # C2 = ②行业观察型
   watchlist: []
-  cross_check_tolerance: 0.015    # D6 = ①宽松 1.5%
+  cross_check_tolerance: 0.015    # F6 = ①宽松 1.5%
   require_source_annotation: true
 
 output:
-  language: zh                    # D3 = ①中文
-  depth: brief                    # D1 = ①摘要式
-  format: markdown                # D2 = ①Markdown
-  include_visual: key             # D4 = ②关键图表
-  include_validation_table: mandatory_only  # D5 = ②仅强制核对项
+  language: zh                    # F3 = ①中文
+  depth: brief                    # F1 = ①摘要式
+  format: markdown                # F2 = ①Markdown
+  include_visual: key             # F4 = ②关键图表
+  include_validation_table: mandatory_only  # F5 = ②仅强制核对项
   max_length: 0
 
 corrections: []
@@ -67,6 +67,8 @@ corrections: []
 # · 核心关注：趋势动量、成交额、资金流向、板块强度
 # · 深挖仅承担"观点定调"，主体由行情与资金数据构成
 #
-# 一致性提示：本预设 D1=brief 与 E1=light 匹配，无冲突。
-# 若客户将 D1 改为 dd（尽调级），建议同步将 E1 改为 baseline，
+# 一致性提示：本预设 F1=brief 与 E1=light 匹配，无冲突（v1.9.0：只提示，不自动回退）。
+# ⚠️ v1.9.0：本预设的 A3=aggressive / A4=aggressive 属**表达偏好**，只改"怎么说"；
+#    事实、关键数字、证据状态与结论判定一律不变，也不会提高上行情景的概率或权重。
+# 若客户将 F1 改为 dd（尽调级），建议同步将 E1 改为 baseline，
 # 否则会被一致性检查提示为低效配置。
