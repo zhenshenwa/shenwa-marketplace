@@ -466,17 +466,76 @@ def _plan_fingerprint(plan_date, objects, rep_qs):
     return hashlib.sha256(st.encode("utf-8")).hexdigest()[:8]
 
 
-def make_entry_id(plan_date, n, plan_suffix=None):
-    """条目编号 = `<YYYYMMDD>[-<计划指纹>]-<NN>`。
+def _entry_fingerprint(entry_like):
+    """单条目的**业务身份指纹**（确定性、与清单顺序无关）。
 
-    `plan_suffix` 为 plan 内容指纹（见 `_plan_fingerprint`）：**不同计划的条目天然
-    不冲突**（不再是「日期 + 当天局部序号」这一可冲突形式）；未提供时保持旧格式
-    （仅用于向后兼容的旧记录读取）。
+    ⚠️ 为什么必须由内容决定：`entry_id` 是「任务身份」，恢复（`_restore_into_plan`）
+    与传输层防重（`Client.call(task_id=entry_id)`）**都按它匹配**。若编号里含
+    「清单中的先后序号」，则同一批任务**仅调整问题顺序**就会让两条互换编号 →
+    恢复时读到对方的 aid → **aid 串位**（错误报告绑定到错误问题）。
+
+    · 入参取**业务身份字段**：对象 + 模板 + 问题内容 + 执行参数；
+    · 取字段时对 `question_ids` **排序**、对问题内容取 `source_text` 原文，
+      确保「同一逻辑任务」在任何输入顺序下得到**同一指纹**。
+    """
+    e = entry_like or {}
+    qtexts = [str(x).strip() for x in (e.get("questions") or [])]
+    payload = {
+        "object_id": e.get("object_id"),
+        "object_level": e.get("object_level"),
+        "template_tid": (str(e.get("template_tid"))
+                         if e.get("template_tid") is not None else None),
+        "question_ids": sorted(str(x) for x in (e.get("question_ids") or [])),
+        "questions": sorted(qtexts),
+        "research_cutoff": e.get("research_cutoff"),
+    }
+    st = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(st.encode("utf-8")).hexdigest()[:8]
+
+
+def make_entry_id(plan_date, n, plan_suffix=None, *, business_fp=None):
+    """条目编号 = `<YYYYMMDD>-<业务身份指纹>-<NN>`。
+
+    **业务身份与展示序号分离（第 17 轮）**：
+    · **身份部分**（`business_fp`，由对象 / 模板 / 问题内容 / 执行参数生成）——
+      决定「这是哪条任务」。同一逻辑任务在任何清单顺序下 **id 保持稳定**；
+    · **展示序号**（`NN`）—— 仅用于人读与稳定排序，**不参与身份判定**。
+      恢复时若 `business_fp` 命中，即使 `NN` 因顺序变化而不同，也**能正确绑定**。
+
+    · `plan_suffix` 为 plan 内容指纹（见 `_plan_fingerprint`）：不同计划的条目天然不冲突；
+    · 未提供时保持旧两段格式（**仅用于向后兼容读取旧记录**，见 `_legacy_entry_alias`）。
     """
     d = plan_date if isinstance(plan_date, str) else plan_date.isoformat()
+    if business_fp:
+        return f"{d}-{business_fp}-{int(n):02d}"
     if plan_suffix:
         return f"{d}-{plan_suffix}-{int(n):02d}"
     return f"{d}-{int(n):02d}"
+
+
+def _legacy_entry_alias(entry_id):
+    """旧记录 `entry_id` → 兼容别名集合（第 17 轮向后兼容）。
+
+    旧格式有**两代**：
+      ① 轮 12 及以前：`<YYYYMMDD>-<NN>`（仅日期 + 当天局部序号）；
+      ② 轮 15 引入指纹后：`<YYYYMMDD>-<plan指纹8位>-<NN>`。
+
+    新格式为 `<YYYYMMDD>-<业务身份指纹8位>-<NN>`。三者**段数相同或不同**，
+    不能靠字符串相等匹配 → 恢复时改为「**按业务身份重算 + 别名表**」双通道匹配
+    （见 `_match_old_entry`）。
+    """
+    eid = str(entry_id or "")
+    parts = eid.split("-")
+    out = set()
+    if len(parts) == 3:                       # 日期-指纹-NN（旧② 或 新）
+        out.add(f"{parts[0]}-{parts[2]}")      # → 日期-NN（旧① 形态，供旧①记录比对）
+        out.add(f"{parts[0]}-{parts[1]}-{parts[2]}")
+    elif len(parts) == 2:                     # 日期-NN（旧①）
+        out.add(eid)
+    if eid:
+        out.add(eid)
+    return out
+
 
 
 def plan_fingerprint(item):
@@ -484,14 +543,18 @@ def plan_fingerprint(item):
 
     `gate()` 用它判断「检查之后是否被改过」—— 改过就必须**重新检查**，
     **不得**沿用旧结果直接发布。
+
+    ⚠️ 第 17 轮：`question_ids` / `input_materials` 改为**排序后**入指纹 ——
+    否则**仅调整问题在清单中的先后**就会让 `plan_hash` 变化，被误判成
+    「关键参数已变」，导致本可恢复的任务被强制重检 / 不继承旧结果。
     """
     payload = {
         "object_id": item.get("object_id"),
         "object_level": item.get("object_level"),
         "template_tid": item.get("template_tid"),
-        "question_ids": list(item.get("question_ids") or []),
+        "question_ids": sorted(str(x) for x in (item.get("question_ids") or [])),
         "submit_params": item.get("submit_params") or {},
-        "input_materials": item.get("input_materials") or [],
+        "input_materials": sorted(str(x) for x in (item.get("input_materials") or [])),
         "research_cutoff": item.get("research_cutoff"),
     }
     st = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
@@ -818,6 +881,13 @@ def build(req, *, templates=None, history=None, objects=None, object_level=None,
         groups[key]["qs"].append(q)
 
     items, warnings = [], []
+    # ★ 第 17 轮：**条目顺序 = 输入顺序**（保持原语义），
+    #   ⚠️ **不再对 `order` 重排序** —— 条目的先后与「问题清单 / 模板成本清单」的
+    #   呈现顺序一致（逐项加总等按位断言依赖它）。
+    #   防「aid 串位」**不由排序保证**，而由**业务身份绑定**保证：
+    #   每条目各有 `business_fp`（与清单顺序无关），恢复时按它匹配
+    #   （见 `_match_old_entry`）—— 即使两条的 `NN` 因顺序变化而互换，
+    #   也能各自绑回自己的 aid。
     for i, key in enumerate(order, 1):
         g = groups[key]
         oid, tid, qlist = g["object_id"], g["template_tid"], g["qs"]
@@ -865,7 +935,7 @@ def build(req, *, templates=None, history=None, objects=None, object_level=None,
             text_val = bg["sent_text"]                  # 超限时为 None（**不截断**）
 
         entry = {
-            "entry_id": make_entry_id(pd, i, plan_suffix),
+            "entry_id": None,          # ★ 先占位，待业务身份字段齐全后回填（见下方）
             "plan_id": plan_id,
             "object_id": oid,
             "object_level": qlist[0].get("object_level") or level,
@@ -902,6 +972,13 @@ def build(req, *, templates=None, history=None, objects=None, object_level=None,
             "attempts": 0,
             "notes": [],
         }
+        # ★ 第 17 轮：业务身份与展示序号分离 ——
+        #   `business_fp` 由「对象 / 模板 / 问题内容 / 执行参数」决定（与清单顺序无关），
+        #   `seq` 仅作展示序号。这样**仅调整问题顺序不会导致 aid 串位**。
+        entry["business_fp"] = _entry_fingerprint(entry)
+        entry["seq"] = i
+        entry["entry_id"] = make_entry_id(pd, i, plan_suffix,
+                                          business_fp=entry["business_fp"])
         entry["plan_hash"] = plan_fingerprint(entry)
         qlen = len(entry["submit_params"]["question"] or "")
         if qlen > QUESTION_LIMIT:
@@ -1320,12 +1397,20 @@ def publish(item, *, client, plan=None, budget=None, gate_kwargs=None,
     # ★ 第 4 轮：**保存实际发送的参数与文字**（验收查的是这里，不是组装函数的输出）
     # ★ 第 15 轮：**task_id = entry_id** —— 同一条目重试沿用同一任务身份，
     #   由 Client.call 的防重机制阻断重复发布（跨会话/跨进程均生效）。
+    # ★ 第 17 轮：另传 `business_fp`（业务身份指纹）—— 兼容「编号算法升级」场景：
+    #   旧记录以旧格式 entry_id 作 task_id，新代码算出新格式，仅靠 task_id 会误判为
+    #   新任务而**重发已受理的任务**；`business_fp` 让底层能兜底认出「同一条业务任务」。
     sent = dict(item.get("submit_params") or {})
     out["sent_params"] = dict(sent)
     out["sent_text"] = sent.get("text")
     out["sent_text_length"] = len(sent.get("text") or "")
     out["text_check"] = check_text_length(sent.get("text"))
-    res = client.call(api, sent, task_id=item.get("entry_id"))
+    try:
+        res = client.call(api, sent, task_id=item.get("entry_id"),
+                          business_fp=item.get("business_fp"))
+    except TypeError:
+        # 兼容旧版客户端替身（无 business_fp 形参）—— 不改变可观察行为
+        res = client.call(api, sent, task_id=item.get("entry_id"))
     out["publish_calls"] = 1
     out["result"] = res.to_dict() if hasattr(res, "to_dict") else dict(res or {})
     cat = getattr(res, "category", None)
@@ -1448,6 +1533,15 @@ def restore_pending(path=None, plan_id=None):
     · `plan_id` 精确匹配：找不到时 `found=False` 且 `plan_not_found=True`，
       **不得回退到其它计划冒充匹配结果**；
     · 记录损坏/不可读 → `read_error` 显式列出，不得当成「无历史」。
+
+    **第 17 轮（旧版本兼容）**：
+    · 读回时**为缺失 `business_fp` 的旧记录就地回算**并写入 `business_fp_resolved`
+      —— 旧包（轮 12 / 轮 15）生成的台账**没有**该字段，若不回算，新包恢复时
+      无法按业务身份匹配，会把「已受理」误当新任务重发；
+    · 新增 `executable_after_auth`：**待授权且 `reserve_state=none`** 的条目 ——
+      既未发送、也未占额度 → 授权补足后**可正常执行**（区别于其余待授权条目）；
+    · 新增 `needs_review`：**既不能确定匹配、也不能确定是待执行**的条目 ——
+      进「待核对」，**不自动重发**（无法可靠匹配时不得猜测）。
     """
     snaps, errors = load_state(path)
     if errors:
@@ -1467,21 +1561,39 @@ def restore_pending(path=None, plan_id=None):
                     "note": f"未找到 plan_id={plan_id} 的计划快照（精确匹配，不回退到其它计划）"}
         snap = matched[0]
     items = snap.get("items") or []
+    # ★ 第 17 轮：旧记录缺 business_fp → 就地回算（不写回原文件，只在本返回中补）
+    for it in items:
+        if not it.get("business_fp"):
+            it["business_fp_resolved"] = _entry_fingerprint(it)
     blocked = [it.get("entry_id") for it in items
                if it.get("state") in ("accepted", "done", "submit_unknown")]
     # ★ 提交意图已保存但结果未保存（submitting）→ 待核对，不得重新提交
     to_reconcile = [it.get("entry_id") for it in items if it.get("state") == "submitting"]
+    # ★ 待授权且**从未预留**（reserve_state=none）= 从未发送 → 授权补足后可正常执行
+    executable_after_auth = [
+        it.get("entry_id") for it in items
+        if it.get("state") == "pending_authorization"
+        and (it.get("reserve_state") or "none") == "none"]
+    # ★ 待授权但已预留 / 未知 → 占用保留，需人工确认金额，不得直接执行
+    held_authorization = [
+        it.get("entry_id") for it in items
+        if it.get("state") == "pending_authorization"
+        and (it.get("reserve_state") or "none") != "none"]
     return {
         "found": True, "plan_id": snap.get("plan_id"), "ts": snap.get("ts"),
         "items": items,
         "blocked_resubmit": blocked,
         "to_reconcile": to_reconcile,
+        "executable_after_auth": executable_after_auth,
+        "held_authorization": held_authorization,
+        "needs_review": list(to_reconcile),
         "pending": [it.get("entry_id") for it in items if it.get("state") == "pending"],
         "unknown": [it.get("entry_id") for it in items if it.get("state") == "submit_unknown"],
         "accepted": [it.get("entry_id") for it in items if it.get("state") == "accepted"],
         "note": "已受理 / 结果未知 / 提交中 的条目**保留占用、不重复发布**；"
                 "`submit_unknown` 沿用只读 `reconcile()` 核对；"
-                "`submitting` 进入待核对（不直接恢复为 pending）",
+                "`submitting` 进入待核对（不直接恢复为 pending）；"
+                "**待授权且 `reserve_state=none`** → 未发送未占用，授权补足后可执行",
     }
 
 
@@ -1489,24 +1601,123 @@ def restore_pending(path=None, plan_id=None):
 # 9. 代表性流程：问题清单 → … → 交付覆盖检查
 # ═══════════════════════════════════════════════════════════════════
 
+def _match_old_entry(it, by_entry, by_business, by_legacy_entry, idx_legacy_business):
+    """为新计划的条目 `it` 在旧快照中**定位对应记录**（第 17 轮）。
+
+    匹配优先级（**先精确、后兼容**，任何一步命中即返回）：
+      ① **业务身份指纹**（`business_fp`）—— 首选。与清单顺序**完全无关**；
+      ② `entry_id` 精确 —— 旧记录里已有同 id 时直接用；
+      ③ **旧 `entry_id` 别名**（`_legacy_entry_alias`）—— 兼容轮 12 的
+         `<日期>-<NN>` 与轮 15 的 `<日期>-<plan指纹>-<NN>`；
+      ④ **旧记录回算的 `business_fp`** —— 旧包（轮 12 / 15）台账**没有** `business_fp`
+         字段，上面三步都命中不了；此处用**新条目自身字段**就地回算出身份指纹，
+         再与「旧记录回算值」比对 —— 只要业务内容相同即可命中，
+         **跨编号算法**也能认出「这是同一条任务」，从而不误判为新任务重发。
+
+    返回 `(old, how)`；`how` 记录命中通道，便于排查「为什么这条被认成同一条」。
+    未命中返回 `(None, None)` → 调用方**不得**推定匹配（进「待核对」）。
+    """
+    if not isinstance(it, dict):
+        return None, None
+    bfp = it.get("business_fp")
+    if bfp and bfp in by_business:
+        return by_business[bfp], "business_fp"
+    eid = it.get("entry_id")
+    if eid and eid in by_entry:
+        return by_entry[eid], "entry_id"
+    for alias in _legacy_entry_alias(eid):
+        if alias in by_legacy_entry:
+            return by_legacy_entry[alias], "legacy_entry_alias"
+    # ④ 双方都回算身份指纹后比对（兼容无 business_fp 的旧台账）
+    new_fp = bfp or _entry_fingerprint(it)
+    if new_fp and new_fp in idx_legacy_business:
+        return idx_legacy_business[new_fp], "legacy_business_fp"
+    return None, None
+
+
 def _restore_into_plan(plan, save_path, ledger):
     """恢复：把**已保存**的条目状态回填到新 build 的计划，并恢复预算占用。
 
-    · 按 `plan_id`（含内容指纹，确定性）精确匹配历史快照；
+    · **匹配按业务身份**（`business_fp` 优先，见 `_match_old_entry`）——
+      清单顺序变化**不会**导致 aid 串位；旧格式记录走别名 / 回算通道兼容；
     · 已受理（accepted）/ 已完成（done）/ 结果未知（submit_unknown）/ 提交中（submitting）
-      的条目 → 状态回填 + aid 完整保留 + 预算占用恢复（accepted 结算、未知/submitting 预留）；
+      的条目 → 状态回填 + aid 完整保留 + 预算占用恢复；
+    · **待授权（pending_authorization）按 `reserve_state` 区分**（第 17 轮修正）：
+      - `reserve_state == "none"`（**从未预留 = 从未发送**）→ **不占用额度**，
+        授权补足后应能正常执行（**不得一律记为未知占用**）；
+      - 其它（reserved / settled / unknown）→ 占用按「未知金额」保留，不得清零；
+    · **关键参数已变**（`plan_hash` 不一致）→ **不继承旧结果**（状态归 pending、aid 清空），
+      交由 `gate()` 第⑤查要求重新检查；
     · 返回回填后的 plan 和恢复摘要；无历史 / 记录损坏时**不静默当新任务**。
     """
     rec = restore_pending(save_path, plan_id=plan.get("plan_id"))
-    restored = []
+    restored, unmatched = [], []
+    # ★ 第 17 轮：`plan_id` 精确匹配不到时**不得直接放弃** ——
+    #   旧包（轮 12 / 15）台账的 `plan_id` 由**旧算法**生成，与本版必然不同；
+    #   若只看 plan_id 就会判「无历史」→ 把**已受理的任务当新任务重发**。
+    #   降级：读全部快照，再按**业务身份**逐条匹配（匹配本身是精确的，
+    #   未命中的进入 `unmatched`，**不做任何推定**）。
+    degraded = False
+    if not rec.get("found") and not rec.get("read_error") and not rec.get("plan_not_found"):
+        pass                                   # 真「无历史」→ 保持原样
+    elif not rec.get("found") and rec.get("plan_not_found"):
+        rec_all = restore_pending(save_path, plan_id=None)
+        if rec_all.get("found"):
+            rec = rec_all
+            degraded = True
+            rec["note"] = (rec.get("note") or "") + \
+                "；plan_id 未命中 → **已降级为按业务身份匹配全部快照**（兼容旧算法台账）"
     if not rec.get("found"):
-        return plan, {"restored": restored, "restore": rec}
-    by_entry = {it.get("entry_id"): it for it in rec.get("items") or []}
+        return plan, {"restored": restored, "unmatched": unmatched,
+                      "restore": rec, "degraded_match": degraded}
+    old_items = list(rec.get("items") or [])
+    by_entry = {it.get("entry_id"): it for it in old_items if it.get("entry_id")}
+    # ★ 业务身份索引：优先用记录里**原生** `business_fp`；旧记录用回算值
+    #   （`restore_pending` 已就地补 `business_fp_resolved`）
+    by_business = {}
+    for it in old_items:
+        b = it.get("business_fp") or it.get("business_fp_resolved")
+        if b:
+            by_business.setdefault(b, it)
+    # ④ 旧记录回算身份指纹索引：旧台账没有 `business_fp` 时，
+    #    用其自身字段就地回算 —— 与新条目回算值比对即可认出同一业务任务
+    idx_legacy_business = {}
+    for o in old_items:
+        b = o.get("business_fp") or o.get("business_fp_resolved")
+        if not b:
+            b = _entry_fingerprint(o)
+            o.setdefault("_legacy_business_fp", b)
+        idx_legacy_business.setdefault(b, o)
+    by_legacy_entry = {}
+    for o in old_items:
+        for alias in _legacy_entry_alias(o.get("entry_id")):
+            by_legacy_entry.setdefault(alias, o)
+
     for it in plan.get("items") or []:
-        old = by_entry.get(it.get("entry_id"))
+        old, how = _match_old_entry(it, by_entry, by_business,
+                                    by_legacy_entry, idx_legacy_business)
         if not old:
+            unmatched.append({"entry_id": it.get("entry_id"),
+                              "business_fp": it.get("business_fp")})
             continue
         st = old.get("state")
+        # —— ★ 关键参数已变 → **不继承旧结果**（第 17 轮） ——
+        # 对象 / 模板 / 问题 / 提交参数任一变 → plan_hash 变 → 旧 aid 与新条目无因果
+        old_hash = old.get("plan_hash")
+        new_hash = it.get("plan_hash")
+        params_changed = bool(old_hash and new_hash and old_hash != new_hash)
+        if params_changed:
+            unmatched.append({"entry_id": it.get("entry_id"),
+                              "business_fp": it.get("business_fp"),
+                              "reason": "params_changed",
+                              "old_state": st, "old_aid": old.get("aid")})
+            it["state"] = "pending"
+            it["aid"] = None
+            it["reserve_state"] = "none"
+            it.setdefault("notes", []).append(
+                "关键参数已变（对象/模板/问题/提交参数）→ **不继承旧结果**，"
+                "须重新检查后再发布")
+            continue
         # 已受理 / 已完成 / 结果未知 / 提交中 / **待授权** 一律回填 ——
         # `pending_authorization` 也必须回填，否则恢复后**丢失原占用**，
         # 下一次就会因为「账本为空」而重新预留成功并真的把条目发出去。
@@ -1520,12 +1731,22 @@ def _restore_into_plan(plan, save_path, ledger):
                 if st in ("accepted", "done"):
                     ledger.settle(it["entry_id"], actual=old.get("cost"))
                 elif st == "pending_authorization":
-                    # 待授权：占用按「未知金额」保留，**不得清零**
-                    ledger.mark_unknown(it["entry_id"], old.get("cost"))
+                    rs_old = old.get("reserve_state") or "none"
+                    if rs_old == "none":
+                        # ★ 从未预留 = **从未发送** → 不占额度；授权补足后正常执行
+                        it["reserve_state"] = "none"
+                        it.setdefault("notes", []).append(
+                            "待授权且 `reserve_state=none` → 未发送、**未占用额度**；"
+                            "授权补足后**可正常执行**")
+                    else:
+                        # 其它情况：占用按「未知金额」保留，**不得清零**
+                        ledger.mark_unknown(it["entry_id"], old.get("cost"))
                 else:
                     ledger.mark_unknown(it["entry_id"], old.get("cost"))
-            restored.append({"entry_id": it["entry_id"], "state": st, "aid": old.get("aid")})
-    return plan, {"restored": restored, "restore": rec}
+            restored.append({"entry_id": it["entry_id"], "state": st,
+                             "aid": old.get("aid"), "matched_by": how})
+    return plan, {"restored": restored, "unmatched": unmatched, "restore": rec,
+                  "degraded_match": degraded}
 
 
 class RecordingClient:
@@ -2453,12 +2674,49 @@ def selftest() -> int:
     ck(all(re.fullmatch(r"20261003-[0-9a-f]{8}-\d{2}", it["entry_id"])
            for it in plan8["items"]),
        "T12 entry_id 含内容指纹（跨计划不冲突）")
-    ck(all(it["entry_id"].startswith(f"20261003-{plan8['plan_id'].split('-')[-1]}-")
+    # ★ 第 17 轮：身份部分改为**业务身份指纹**（对象/模板/问题内容/执行参数），
+    #    与「清单顺序」无关；展示序号 `seq` 另存，不参与身份。
+    ck(all(it["entry_id"].split("-")[1] == it["business_fp"]
            for it in plan8["items"]),
-       "T12 entry_id 前缀含 plan 指纹")
+       "T12 entry_id 身份段 = business_fp")
+    ck(all(re.fullmatch(r"[0-9a-f]{8}", it["business_fp"]) for it in plan8["items"]),
+       "T12 business_fp 为 8 位十六进制")
+    # 否证：**plan 指纹不得再作为 entry_id 的身份段**（否则顺序一变就会串位）
+    ck(not any(it["entry_id"].split("-")[1] == plan8["plan_id"].split("-")[-1]
+               for it in plan8["items"]),
+       "T12 否证：entry_id 身份段不得是 plan 指纹")
+    ck(all(it.get("seq") == idx for idx, it in enumerate(plan8["items"], 1)),
+       "T12 展示序号 seq 为 1..N 连续")
     ck(plan8["coverage"]["non_report_questions"] == ["公司1-Q3"],
        f"T12 直取问题不建条目：{plan8['coverage']}")
     ck(len({it["entry_id"] for it in plan8["items"]}) == plan8["n_items"], "T12 编号不重复")
+
+    # 12b. ★ 第 17 轮核心断言：**顺序变化下，业务身份（business_fp）逐条不变**。
+    #   注意：`NN`（展示序号）**允许**随输入顺序变化（条目顺序 = 输入顺序）；
+    #   真正保证「aid 不串位」的是 **business_fp 与条目的绑定**，不是 `NN`。
+    req8r = {"objects": list(req8["objects"]), "object_level": "个股",
+             "questions": list(reversed(req8["questions"]))}
+    plan8r = build(req8r, templates=TPL, plan_date="20261003")
+    fp_a = {(it["object_id"], it["template_tid"]): it["business_fp"]
+            for it in plan8["items"]}
+    fp_b = {(it["object_id"], it["template_tid"]): it["business_fp"]
+            for it in plan8r["items"]}
+    ck(fp_a == fp_b,
+       "T12b 顺序无关：反转问题顺序后 business_fp 逐条不变（身份稳定）")
+    # entry_id 身份段 = business_fp → 身份段也逐条不变（`NN` 与排列可变）
+    idseg_a = {(it["object_id"], it["template_tid"]): it["entry_id"].split("-")[1]
+               for it in plan8["items"]}
+    idseg_b = {(it["object_id"], it["template_tid"]): it["entry_id"].split("-")[1]
+               for it in plan8r["items"]}
+    ck(idseg_a == idseg_b,
+       "T12b 顺序无关：entry_id 的身份段（= business_fp）逐条不变")
+    # 否证：若身份段仍由「清单先后」决定，反转后同一业务键的身份段必然改变
+    ck(all(fp_a and out and out[:1] for out in idseg_a.values()),
+       "T12b 否证：身份段非空且按业务键稳定 —— 不得因顺序变化而改变")
+    # 排列确实随输入顺序变化（说明 NN 只是展示序号，不影响身份绑定）
+    ck([it["object_id"] for it in plan8r["items"]]
+       == list(reversed([it["object_id"] for it in plan8["items"]])),
+       "T12b 展示序号随输入顺序：排列 = 输入顺序的反转（NN 不参与身份）")
 
     # 13. 未知成本不得按 0：成本全未知 → 计划 cost.exact=False
     planX = build(req8, templates={"data": [{"templates": [{"id": "9", "title": "x"}]}]},
@@ -2478,6 +2736,134 @@ def selftest() -> int:
         rec = restore_pending(p)
         ck(len(rec["blocked_resubmit"]) == 2, f"T14 两条不得重提：{rec}")
         ck(rec["pending"] == [dd["items"][2]["entry_id"]], f"T14 待执行只剩 1 条：{rec}")
+
+    # ─────────────────────────────────────────────────────────────
+    # 第 17 轮：任务身份与报告绑定 / 旧版本兼容 / 补充授权后恢复
+    # ─────────────────────────────────────────────────────────────
+
+    # 14b. ★ 顺序调整：**aid 不串位**（恢复按业务身份，不按编号字符串）
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "plans.jsonl")
+        # 旧计划：第 1 条已受理（aid=A@@1）、第 2 条已受理（aid=A@@2）
+        dd = dict(plan8)
+        dd["items"] = [dict(plan8["items"][0], state="accepted", aid="A@@1"),
+                       dict(plan8["items"][1], state="accepted", aid="A@@2")]
+        save_state(dd, p)
+        # 新计划：**反转问题清单顺序**后重建（模拟「顺序被调整」）
+        req_rev = {"objects": list(req8["objects"]), "object_level": "个股",
+                   "questions": list(reversed(req8["questions"]))}
+        plan_rev = build(req_rev, templates=TPL, plan_date="20261003")
+        led = BudgetLedger()
+        plan_rev2, info = _restore_into_plan(plan_rev, p, led)
+        got = {(it["object_id"], it["template_tid"]): (it["state"], it["aid"])
+               for it in plan_rev2["items"]}
+        want = {(plan8["items"][0]["object_id"], plan8["items"][0]["template_tid"]):
+                ("accepted", "A@@1"),
+                (plan8["items"][1]["object_id"], plan8["items"][1]["template_tid"]):
+                ("accepted", "A@@2")}
+        ck(all(got.get(k) == v for k, v in want.items()),
+           f"T14b 顺序反转后 aid 仍绑定原对象/模板（不串位）：{got}")
+        # 旧快照只有 2 条 → 其余 14 条**本就不在旧台账中**，属正常「无历史」；
+        # 断言：那 2 条**必须命中**，而非「一条都不能 unmatched」
+        hit_fps = {plan8["items"][0]["business_fp"], plan8["items"][1]["business_fp"]}
+        ck(not any(u.get("business_fp") in hit_fps for u in info["unmatched"]),
+           f"T14b 旧台账中存在的两条不得被判为无法匹配：{info['unmatched']}")
+        ck(len(info["restored"]) == 2,
+           f"T14b 应恰好恢复 2 条：{len(info['restored'])}")
+        ck(all(r["matched_by"] in ("business_fp", "entry_id", "legacy_entry_alias",
+                                   "legacy_business_fp") for r in info["restored"]),
+           f"T14b 匹配通道合法：{info['restored']}")
+
+    # 14c. ★ 关键参数改变 → **不继承旧结果**
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "plans.jsonl")
+        old = dict(plan8["items"][0], state="accepted", aid="OLD@@1")
+        old["plan_hash"] = plan_fingerprint(old)
+        dd = dict(plan8)
+        dd["items"] = [old]
+        save_state(dd, p)
+        # 新条目：同业务身份（同对象/模板/问题），但**提交参数已改**
+        new_plan = build(req8, templates=TPL, plan_date="20261003")
+        tgt = new_plan["items"][0]
+        tgt["submit_params"] = dict(tgt["submit_params"], text="改过的背景文本")
+        tgt["plan_hash"] = plan_fingerprint(tgt)      # 重算 → 与旧 hash 不同
+        led = BudgetLedger()
+        np2, info = _restore_into_plan(new_plan, p, led)
+        t2 = np2["items"][0]
+        ck(t2["state"] == "pending" and t2["aid"] is None,
+           f"T14c 关键参数已变 → 不继承旧状态/旧 aid：{t2['state']}/{t2['aid']}")
+        ck(any(u.get("reason") == "params_changed" for u in info["unmatched"]),
+           f"T14c 应记为 params_changed：{info['unmatched']}")
+
+    # 14d. ★ 待授权且 reserve_state=none → 授权补足后**可执行**（不占未知额度）
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "plans.jsonl")
+        dd = dict(plan8)
+        dd["items"] = [
+            dict(plan8["items"][0], state="pending_authorization", reserve_state="none"),
+            dict(plan8["items"][1], state="pending_authorization", reserve_state="reserved"),
+        ]
+        save_state(dd, p)
+        rec = restore_pending(p)
+        ck(rec["executable_after_auth"] == [dd["items"][0]["entry_id"]],
+           f"T14d 未发送未占用 → 授权后可执行：{rec}")
+        ck(rec["held_authorization"] == [dd["items"][1]["entry_id"]],
+           f"T14d 已预留 → 占用保留：{rec}")
+        led = BudgetLedger()
+        np3, info3 = _restore_into_plan(dict(plan8), p, led)
+        snap = led.snapshot()
+        ck(np3["items"][0]["reserve_state"] == "none",
+           f"T14d 未发送条目的 reserve_state 保持 none：{np3['items'][0]['reserve_state']}")
+        # 已预留条目 → 以「未知金额」保留占用（记入 reserved / unknown_entries）
+        held_eid = plan8["items"][1]["entry_id"]
+        ck(held_eid in (snap.get("unknown_entries") or []),
+           f"T14d 已预留条目仍计未知占用：{snap.get('reserved')}")
+        # 否证：**未发送**的条目不得进入未知占用
+        none_eid = plan8["items"][0]["entry_id"]
+        ck(none_eid not in (snap.get("unknown_entries") or []),
+           f"T14d 否证：未发送条目不得记未知占用：{snap.get('unknown_entries')}")
+
+    # 14e. ★ 旧版本台账兼容：**无 business_fp 的旧记录**按回算身份匹配
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "plans.jsonl")
+        # 用**当前新算法**构造一条正常条目，再把它**降级成旧包台账**的样子：
+        #   去掉 business_fp / seq、entry_id 换成轮 12 的 `<日期>-<NN>`、
+        #   plan_id 换成旧算法产物（与新版必然不同）
+        legacy = dict(plan8["items"][0], state="accepted", aid="LEG@@1")
+        legacy.pop("business_fp", None)
+        legacy.pop("seq", None)
+        legacy["entry_id"] = "20261003-01"
+        legacy_pid = "PLAN-20261003-legacy0001"
+        legacy["plan_id"] = legacy_pid
+        dd = {"ts": "2026-10-03T00:00:00+08:00", "plan_id": legacy_pid,
+              "items": [legacy]}
+        save_state(dd, p)
+        rec = restore_pending(p, plan_id=legacy_pid)
+        ck(rec["found"], "T14e 旧 plan_id 可精确匹配")
+        ck(rec["items"][0].get("business_fp_resolved"),
+           "T14e 旧记录须就地回算出 business_fp_resolved")
+        # 🔴 关键：新包按**新算法**重建 → plan_id 与旧记录**不同**，
+        #    若靠 plan_id 匹配就会「找不到历史」→ 重发已受理任务。
+        #    本断言要求：靠**回算业务身份**仍能命中旧记录。
+        new_plan = build(req8, templates=TPL, plan_date="20261003")
+        ck(new_plan["plan_id"] != legacy_pid,
+           "T14e 前提：新算法 plan_id 与旧记录不同（否则断言无意义）")
+        led = BudgetLedger()
+        np5, info5 = _restore_into_plan(new_plan, p, led)
+        t5 = {it["business_fp"]: it for it in np5["items"]}.get(
+            plan8["items"][0]["business_fp"])
+        ck(t5 is not None, "T14e 目标条目在场")
+        ck(t5["state"] == "accepted" and t5["aid"] == "LEG@@1",
+           f"T14e 旧台账的「已受理」被认出（不重发）：{t5['state']}/{t5['aid']}")
+        ck(any(r.get("matched_by") in ("legacy_entry_alias", "legacy_business_fp",
+                                       "business_fp")
+               for r in info5["restored"]),
+           f"T14e 命中通道应为兼容通道：{info5['restored']}")
+
+    # 14f. ★ 顺序无关的确定性：同内容两次 build（顺序不同）plan_id 相同
+    ck(plan8["plan_id"] == build(req8r, templates=TPL,
+                                 plan_date="20261003")["plan_id"],
+       "T14f plan_id 与问题顺序无关（内容相同 → 同 plan_id）")
 
     # 15. 回归：不改动既有客户端契约
     try:

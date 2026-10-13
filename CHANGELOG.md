@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## 2026-10-13 — 轮 17（待定版号）：任务身份与报告绑定 / 旧版本任务兼容 / 补充授权后恢复
+
+> 用户口径「第 6 轮补丁（重新做一次）」：按文字描述实施三组修复。**版本号未升**（仍 `1.15.1 / 1.1.7`），
+> 本轮为脚本层修复，**未做客户端实跑验证**。
+
+| 专家 | 版本 | 说明 |
+|---|---|---|
+| shenwa-hybrid-research | `1.15.1`（不变） | ① 业务身份与展示序号分离：`entry_id = <日期>-<business_fp>-<NN>`，`business_fp` 由对象/模板/问题内容/执行参数决定、**与清单顺序无关**；关键参数变更（`plan_hash` 变）**不继承旧结果**。② 旧版本任务兼容：旧记录回算 `business_fp_resolved`、`_match_old_entry` 4 级匹配、`plan_id` 未命中时**降级按业务身份匹配全部快照**、无法可靠匹配进「待核对」不自动重发；旧记录/旧 aid/旧占用一律保留。③ 补充授权后恢复：`pending_authorization` 按 `reserve_state` 分叉 —— `none`（从未预留=从未发送）**不占额度、授权后可执行**；其余 `mark_unknown` 保留占用。`selftest` 92→**118 项**。 |
+| shenwa-agent | `1.1.7`（不变） | 同步 `shenwa_api.py` 兼容层：`_dedup_key` / `Client.call` / `_find_existing` 增 `business_fp` 通道；新增 `_find_existing_compat()` **保留复核方旧 4 参签名夹具**。`selftest` 保持 **56 项**。 |
+
+**变更**：
+
+- `skills/shenwa-hybrid/scripts/publish_plan.py`（`selftest` 92→**118 项**）——
+  - 新增 `_entry_fingerprint()`：业务身份指纹（`object_id` / `object_level` / `template_tid` / `question_ids`(sorted) / `questions`(sorted) / `research_cutoff`）。
+  - `make_entry_id(..., *, business_fp=None)`：编号改为三段 `日期-业务身份指纹-NN`；未传时保持旧两段格式仅供读旧记录。
+  - 新增 `_legacy_entry_alias()`：兼容轮12 `<日期>-<NN>` 与轮15 `<日期>-<plan指纹>-<NN>`。
+  - `plan_fingerprint()`：`question_ids` / `input_materials` 改 **sorted** 入指纹 → 仅调整顺序不再误判「关键参数已变」。
+  - `build()`：条目新增 `business_fp` / `seq`；**条目顺序保持输入顺序**（不重排序 —— 防串位由身份绑定保证，不由排序保证）。
+  - `_restore_into_plan()`：`plan_hash` 不等等于关键参数已变 → 状态归 `pending`、aid 清空、记 `params_changed`；`pending_authorization` 按 `reserve_state` 分叉。
+  - `_match_old_entry()`：`business_fp` → `entry_id` → 旧别名 → 旧记录回算身份指纹，四级匹配。
+  - `restore_pending()`：旧记录回算 `business_fp_resolved`；新增 `executable_after_auth` / `held_authorization` / `needs_review`。
+  - `publish()`：`client.call(..., task_id=entry_id, business_fp=...)`，带 `except TypeError` 回退旧签名。
+- `skills/shenwa/shenwa_api.py`（hybrid 与 agent 两链同步）——
+  - `_dedup_key(task_id, fingerprint, business_fp=None)`：新增 `business_fp` 通道。
+  - `Client.call(..., business_fp=None)`；`_find_existing` 候选集增 `business_fp` 命中。
+  - 新增 `Client._find_existing_compat()`：先按新签名调用，捕获**参数不匹配型 `TypeError`** 后退回旧 4 参签名 —— **保留复核方夹具原件不改**。
+- `skills/shenwa/SKILL.md`（hybrid 包）：`transition_type` 取值由**四种**更正为**七种**（`Hold` / `Upgrade` / `Breakdown` / `Downgrade` / `Recovery` / `Upgrade_Jump` / `Unknown`，2026-10-10 实测 434 行），并加「`Downgrade` / `Recovery` / `Upgrade_Jump` 暂不入表，**不得**折算进升级/破坏数」的边界注记。
+
+**验收**（离线替身 + 合成材料，**不产生任何真实付费发布**）：`publish_plan.py selftest` **118**、`shenwa_api.py selftest` 83（hybrid）/ 56（agent）、`reuse.py` 27、`capability.py` 101、`router.py` 131、`monitor.py` 40、`test_round15.py` 21 项 / 13 场景、12 项边界反例 **12/12 PASS**、agent 5 项 **5/5 PASS**、`verify.py --backup` **全部通过（exit 0，清单 339 项缺失 0）**。**未删除 / 未跳过 / 未放宽任何断言。**
+
+**未验证**：客户端实跑未做；复核方 6 项检查因附件从未送达**无法执行**（该验收通道缺失）。**未改**深挖 AI 服务端与接口路径。
+
+**纠正记录**：`build()` 曾一度按身份重排序 `order`，破坏轮12 `C19`（逐项加总按位取 `items.0/1`）与轮13 `场景K`（`flow.0/1` 复用判定）等**依赖输入顺序**的既有断言共 7 项；已**恢复输入顺序**，防串位改由 `business_fp` 绑定承担，并改写 `T12b` 断言为「身份段稳定 + 展示序号随输入」。
+
+
 ## 2026-10-04 — v1.15.1 / v1.1.7（第 6 轮补丁：独立复核 12 项边界反例修复）
 
 | 专家 | 版本 | 说明 |

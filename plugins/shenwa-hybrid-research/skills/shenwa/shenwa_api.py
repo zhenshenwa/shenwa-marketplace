@@ -729,12 +729,18 @@ def _fingerprint(api, params):
 # 即判为「同一任务已有未决提交」，进入只读核对，绝不再次发请求。
 
 
-def _dedup_key(task_id, fingerprint):
+def _dedup_key(task_id, fingerprint, business_fp=None):
     """防重主键：**任务身份优先**，无身份时回退参数指纹。
 
     · 同一任务重试必须沿用同一 `task_id` → 不会生成新身份绕过防重；
     · 用户明确发起的独立新任务须提供**新的** `task_id` → 即使参数指纹相同，
       也不会被永久禁止（重新走授权与预算检查）。
+
+    ⚠️ **`business_fp`（第 17 轮）不是主键的一部分** —— 它是**业务身份指纹**
+    （对象 / 模板 / 问题内容 / 执行参数），用于兼容「编号算法升级后 `task_id` 变化」
+    的场景：旧记录用旧格式 `entry_id` 作 `task_id`，新代码算出新格式 `entry_id`，
+    若只看 `task_id` 就会**误判为新任务并重发已受理的任务**。`_find_existing`
+    会用 `business_fp` 做**兜底匹配**（见该函数）。
     """
     return (task_id or ("fp:" + fingerprint)) if (task_id or fingerprint) else None
 
@@ -1103,7 +1109,8 @@ class Client:
                 return status, headers, {"_parse_error": True, "text": text[:400]}
             raise ApiError(CAT_UNKNOWN, f"响应不是合法 JSON（HTTP {status}）：{text[:120]!r}")
 
-    def call(self, name, params=None, timeout=60, dry_run=False, task_id=None):
+    def call(self, name, params=None, timeout=60, dry_run=False, task_id=None,
+             business_fp=None):
         """执行一次调用，返回 `Result`。
 
         `dry_run=True` 只做本地参数校验与计划展示，**绝不发任何请求**
@@ -1113,6 +1120,11 @@ class Client:
         · 同一任务重试必须沿用同一 `task_id`，不会生成新身份绕过防重；
         · 独立新任务给新 `task_id`，即使参数指纹相同也重新走授权与预算检查；
         · 未给 `task_id` 时回退到参数指纹 `fingerprint`。
+
+        `business_fp`（可选，第 17 轮）：**业务身份指纹**（对象 / 模板 / 问题内容 /
+        执行参数），随记录一并落盘，供 `_find_existing` 做**跨编号算法的兜底匹配**。
+        · 只影响「已有记录里**自带该字段**」的比对，不做回算、不猜；
+        · 不传时行为与旧版**完全一致**（向后兼容）。
         """
         if name not in APIS:
             return Result(False, CAT_PARAM, name, message=f"未知接口: {name}（用 list 查看）")
@@ -1168,7 +1180,8 @@ class Client:
         guard_fd = None
         guard_path = None
         if mutating and dedup:
-            blk = self._block_from_existing(name, self._find_existing(dedup, task_id, fp),
+            blk = self._block_from_existing(name, self._find_existing_compat(dedup, task_id, fp,
+                                                                business_fp),
                                             fp, task_id, warnings, t0)
             if blk is not None:
                 return blk
@@ -1187,7 +1200,7 @@ class Client:
                 guard_fd = None
             if guard_fd is not None:
                 blk2 = self._block_from_existing(
-                    name, self._find_existing(dedup, task_id, fp),
+                    name, self._find_existing_compat(dedup, task_id, fp, business_fp),
                     fp, task_id, warnings, t0)
                 if blk2 is not None:
                     # 复检发现已有提交（多为并行进程刚完成）→ 撤销本次资格
@@ -1197,7 +1210,7 @@ class Client:
 
         if mutating and dedup and guard_fd is None:
             # 意图文件已被占用 → 未决提交（并发/上次中断）→ 阻断
-            existing = self._find_existing(dedup, task_id, fp)
+            existing = self._find_existing_compat(dedup, task_id, fp, business_fp)
             blk = self._block_from_existing(name, existing, fp, task_id, warnings, t0)
             if blk is not None:
                 return blk
@@ -1205,7 +1218,7 @@ class Client:
 
         if mutating:
             r = append_task({"ts": _now_iso(), "api": name, "fingerprint": fp,
-                             "task_id": task_id, "dedup": dedup,
+                             "task_id": task_id, "dedup": dedup, "business_fp": business_fp,
                              "account_ref": account_ref(self.uid()), "params_keys": sorted(params),
                              "tid": params.get("tid"), "base_order": list(self.bases),
                              "state": "sent", "aid": None}, self.task_file)
@@ -1431,13 +1444,40 @@ class Client:
             except Exception:                                    # noqa: BLE001
                 pass
 
-    def _find_existing(self, dedup, task_id, fp):
+    def _find_existing_compat(self, dedup, task_id, fp, business_fp=None):
+        """调用 `_find_existing`，**兼容只接受旧签名（无 `business_fp`）的子类**。
+
+        ⚠️ 为什么需要：`_find_existing` 是**可被外部子类覆写**的方法（第 16 轮
+        独立复核夹具 `PausedRead` 就覆写了它以注入受控并发时序）。第 17 轮给它
+        新增了第 4 个参数；若直接按新签名调用，**旧夹具的覆写方法会因参数个数不符
+        抛 `TypeError`** —— 那是我方接口变更破坏了既有验证夹具。
+
+        处理：先按新签名（关键字传 `business_fp`）调用；仅当 `TypeError`
+        **由参数不匹配引起**时退回旧签名。这样：
+          · 新版基类 / 支持新签名的子类 → 完整功能（含业务身份兜底匹配）；
+          · 旧签名子类（如复核夹具）→ 行为与第 16 轮**完全一致**，不中断验证。
+        """
+        try:
+            return self._find_existing(dedup, task_id, fp, business_fp=business_fp)
+        except TypeError as e:
+            msg = str(e)
+            if "_find_existing" in msg and ("positional argument" in msg
+                                            or "unexpected keyword" in msg):
+                return self._find_existing(dedup, task_id, fp)
+            raise
+
+    def _find_existing(self, dedup, task_id, fp, business_fp=None):
         """查找同一任务（按 **dedup 主键**）的已有记录。
 
         · `dedup = task_id`（任务身份，优先）或 `"fp:"+fingerprint`（无身份时回退参数指纹）；
         · **严格按 dedup 匹配**；只有当记录**本身不含 `dedup` 字段**（1.14 旧格式）时，
           才按 `fingerprint` 兜底匹配 —— 既兼容旧记录（旧记录只有指纹、没有任务身份），
           又不会把「参数相同但 task_id 不同的两个独立任务」误判为同一任务而永久禁止；
+        · **`business_fp` 兜底（第 17 轮）**：给了 `business_fp` 时，额外匹配
+          「记录里的 `business_fp` 相同」的条目 —— 用于兼容**编号算法升级**前后的同一任务
+          （旧记录 `task_id` 为旧格式 `entry_id`，新代码算出新格式）。
+          ⚠️ 只在**记录自带 `business_fp`** 时生效，不做任何回算/猜测；
+          且**仅对新代码写入的记录（含该字段）**有意义，不影响旧记录的既有行为。
         · 台账**损坏/不可读** → 返回 `{"_read_error": [...]}`，
           由调用方**阻断发布**（**绝不**把「读不出来」当成「没有历史」继续提交）。
         """
@@ -1448,7 +1488,8 @@ class Client:
         cands = [t for t in rows
                  if t.get("account_ref") == ref
                  and (t.get("dedup") == dedup
-                      or (not t.get("dedup") and fp and t.get("fingerprint") == fp))]
+                      or (not t.get("dedup") and fp and t.get("fingerprint") == fp)
+                      or (business_fp and t.get("business_fp") == business_fp))]
         for st in ("confirmed", "accepted", "done", STATE_SUBMIT_UNKNOWN, "sent"):
             for t in reversed(cands):
                 if t.get("state") == st:
