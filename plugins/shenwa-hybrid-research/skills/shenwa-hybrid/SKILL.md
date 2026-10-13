@@ -2,7 +2,7 @@
 name: shenwa-hybrid
 description: 真深挖综合研究（True Shenwa Integrated Research）。以「深挖出分析主体、数据源做事实校验」的 50/50 分工，完成单项投研任务；客户通过外置偏好文件个性化，输出附校验表并完整引用深挖原文。触发词：真深挖、混合投研、综合研究、投研模式、深挖+数据源、50/50、偏好配置、单项任务、校验表、投研智能体模式。
 description_zh: "真深挖综合研究（四层架构 · 50/50 分工 · 偏好外置）"
-version: 1.15.1
+version: 1.16.0
 ---
 
 # 真深挖综合研究（True Shenwa Integrated Research）

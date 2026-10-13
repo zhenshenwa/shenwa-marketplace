@@ -32,9 +32,9 @@
     {
       "name": "shenwa-hybrid-research",
       "source": "./plugins/shenwa-hybrid-research",
-      "description": "真深挖综合研究 v1.15.1（接入深挖接口 1.0.6）：融合深挖AI与金融数据，支持公司研究、行业比较、趋势监测与关键数据核验。",
-      "description_en": "v1.15.1 · Shenwa API 1.0.6 | Combines Shenwa AI with financial data to support company research, sector comparison, trend monitoring, and key-data verification, with a per-item validation table.",
-      "version": "1.15.1",
+      "description": "真深挖综合研究 v1.16.0（接入深挖接口 1.0.6）：融合深挖AI与金融数据，支持公司研究、行业比较、趋势监测与关键数据核验。",
+      "description_en": "v1.16.0 · Shenwa API 1.0.6 | Combines Shenwa AI with financial data to support company research, sector comparison, trend monitoring, and key-data verification, with a per-item validation table.",
+      "version": "1.16.0",
       "category": "finance",
       "author": {
         "name": "shenwa",
